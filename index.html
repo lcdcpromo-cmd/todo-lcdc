@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>To-Do LCDC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
+    .app { max-width: 680px; margin: 0 auto; padding: 20px 16px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .topbar-title { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .avatars { display: flex; gap: 6px; }
+    .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+    .filters-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .chip { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; white-space: nowrap; transition: all .15s; }
+    .chip:hover { border-color: #aaa; }
+    .chip.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .section-label { font-size: 11px; font-weight: 600; color: #999; letter-spacing: .06em; text-transform: uppercase; margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
+    .task-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 13px; background: #fff; border-radius: 10px; border: 1px solid #ebebeb; margin-bottom: 6px; cursor: pointer; transition: border-color .12s; }
+    .task-row:hover { border-color: #bbb; }
+    .task-check { width: 19px; height: 19px; border-radius: 50%; border: 2px solid #ccc; margin-top: 1px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .task-check.done { background: #1a1a1a; border-color: #1a1a1a; }
+    .task-body { flex: 1; min-width: 0; }
+    .task-name { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
+    .task-name.done { text-decoration: line-through; color: #aaa; }
+    .task-meta { display: flex; gap: 5px; flex-wrap: wrap; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .task-actions { display: flex; gap: 2px; }
+    .icon-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; cursor: pointer; color: #bbb; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all .12s; }
+    .icon-btn:hover { background: #f5f5f5; color: #555; }
+    .add-btn { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 10px; border: 1.5px dashed #ddd; color: #999; font-size: 13px; cursor: pointer; background: transparent; width: 100%; margin-top: 4px; transition: all .15s; }
+    .add-btn:hover { border-color: #aaa; color: #555; }
+    .done-section { opacity: .55; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+    .modal { background: #fff; border-radius: 14px; padding: 20px; width: 100%; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+    .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 500; }
+    .form-row input, .form-row select, .form-row textarea { width: 100%; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid #e0e0e0; background: #fafafa; color: #1a1a1a; font-family: inherit; }
+    .form-row textarea { height: 72px; resize: vertical; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .btn { font-size: 13px; padding: 7px 16px; border-radius: 8px; border: 1px solid #e0e0e0; cursor: pointer; font-family: inherit; background: #fff; color: #444; }
+    .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .btn:hover { background: #f5f5f5; }
+    .btn-primary:hover { background: #333; }
+    .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+    .error-msg { background: #FCEBEB; color: #A32D2D; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <span class="topbar-title">📋 To-Do LCDC</span>
+    <div class="avatars" id="avatars"></div>
+  </div>
+
+  <div id="filtres-groupe" class="filters-bar"></div>
+  <div id="filtres-collab" class="filters-bar"></div>
+  <div style="display:flex; gap: 12px; align-items:center; margin-bottom:8px">
+    <div id="filtres-urgence" class="filters-bar" style="margin:0;flex:1"></div>
+    <select id="filtre-metier" style="font-size:12px;padding:5px 10px;border-radius:20px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer" onchange="appliquerFiltres()">
+      <option value="">Tous les métiers</option>
+    </select>
+  </div>
+
+  <div id="liste-taches"><div class="loading">Chargement…</div></div>
+</div>
+
+<div id="modal-area"></div>
+
+<script>
+var SCRIPT_URL = "COLLE_TON_URL_ICI";
+
+var parametres = { groupes: [], collabs: [], metiers: [], urgences: [], mails: {} };
+var taches = [];
+var filtres = { groupe: "", collab: "", urgence: "", metier: "" };
+
+var COULEURS_COLLABS = {
+  "CYRIL":  { bg: "#E6F1FB", color: "#185FA5" },
+  "ALYSSA": { bg: "#FAEEDA", color: "#854F0B" },
+  "MARION": { bg: "#E1F5EE", color: "#0F6E56" },
+  "UGO":    { bg: "#FBEAF0", color: "#993556" }
+};
+
+var COULEURS_URGENCES = [
+  { bg: "#FCEBEB", color: "#A32D2D" },
+  { bg: "#FAEEDA", color: "#854F0B" },
+  { bg: "#FFF9E6", color: "#92690A" },
+  { bg: "#E6F1FB", color: "#185FA5" },
+  { bg: "#EAF3DE", color: "#3B6D11" }
+];
+
+function call(params, callback) {
+  var url = SCRIPT_URL + "?" + Object.keys(params).map(function(k) {
+    return k + "=" + encodeURIComponent(params[k]);
+  }).join("&");
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(callback)
+    .catch(function(e) { console.error(e); afficherErreur("Impossible de contacter Google Sheets."); });
+}
+
+function afficherErreur(msg) {
+  document.getElementById("liste-taches").innerHTML = '<div class="error-msg">' + msg + '</div>';
+}
+
+function init() {
+  call({ action: "getParametres" }, function(p) {
+    parametres = p;
+    construireFiltres();
+    chargerTaches();
+  });
+}
+
+function construireFiltres() {
+  var hG = '<span class="chip active" onclick="setFiltre(\'groupe\',\'\',this)">Tous</span>';
+  parametres.groupes.forEach(function(g) {
+    hG += '<span class="chip" onclick="setFiltre(\'groupe\',\''+g+'\',this)">'+g+'</span>';
+  });
+  document.getElementById("filtres-groupe").innerHTML = hG;
+
+  var hC = '<span class="chip active" onclick="setFiltre(\'collab\',\'\',this)">Tous</span>';
+  parametres.collabs.forEach(function(c) {
+    hC += '<span class="chip" onclick="setFiltre(\'collab\',\''+c+'\',this)">'+c+'</span>';
+  });
+  document.getElementById("filtres-collab").innerHTML = hC;
+
+  var hU = '<span class="chip active" onclick="setFiltre(\'urgence\',\'\',this)">Toutes</span>';
+  parametres.urgences.forEach(function(u) {
+    hU += '<span class="chip" onclick="setFiltre(\'urgence\',\''+u+'\',this)">'+u+'</span>';
+  });
+  document.getElementById("filtres-urgence").innerHTML = hU;
+
+  var selM = document.getElementById("filtre-metier");
+  parametres.metiers.forEach(function(m) {
+    var o = document.createElement("option"); o.value = m; o.textContent = m;
+    selM.appendChild(o);
+  });
+
+  var hA = "";
+  parametres.collabs.forEach(function(c) {
+    var cl = COULEURS_COLLABS[c] || { bg: "#eee", color: "#555" };
+    var initiales = c.substring(0,2);
+    hA += '<div class="avatar" style="background:'+cl.bg+';color:'+cl.color+'" title="'+c+'">'+initiales+'</div>';
+  });
+  document.getElementById("avatars").innerHTML = hA;
+}
+
+function chargerTaches() {
+  document.getElementById("liste-taches").innerHTML = '<div class="loading">Chargement…</div>';
+  call({ action: "getTaches" }, function(data) {
+    taches = data;
+    afficherTaches();
+  });
+}
+
+function setFiltre(type, val, el) {
+  filtres[type] = val;
+  var bar = el.parentElement;
+  bar.querySelectorAll(".chip").forEach(function(c) { c.classList.remove("active"); });
+  el.classList.add("active");
+  afficherTaches();
+}
+
+function appliquerFiltres() {
+  filtres.metier = document.getElementById("filtre-metier").value;
+  afficherTaches();
+}
+
+function badgeUrgence(u) {
+  var idx = parametres.urgences.indexOf(u);
+  var cl = COULEURS_URGENCES[idx] || { bg: "#eee", color: "#555" };
+  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+u+'</span>';
+}
+
+function badgeCollab(c) {
+  var cl = COULEURS_COLLABS[c] || { bg: "#eee", color: "#555" };
+  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+c+'</span>';
+}
+
+function afficherTaches() {
+  var actives = [], terminees = [];
+  taches.forEach(function(t) {
+    if (filtres.groupe && t.groupe !== filtres.groupe) return;
+    if (filtres.collab && t.collab !== filtres.collab) return;
+    if (filtres.urgence && t.urgence !== filtres.urgence) return;
+    if (filtres.metier && t.metier !== filtres.metier) return;
+    if (t.statut && t.statut.indexOf("Terminé") !== -1) terminees.push(t);
+    else actives.push(t);
+  });
+
+  var html = "";
+  html += '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">' + actives.length + ' tâche' + (actives.length > 1 ? "s" : "") + '</span></div>';
+  if (actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
+  actives.forEach(function(t) { html += carteHTML(t, false); });
+  html += '<button class="add-btn" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
+
+  if (terminees.length > 0) {
+    html += '<div class="section-label done-section">Terminées <span style="font-weight:400;color:#bbb">' + terminees.length + '</span></div>';
+    terminees.forEach(function(t) { html += carteHTML(t, true); });
+  }
+
+  document.getElementById("liste-taches").innerHTML = html;
+}
+
+function carteHTML(t, done) {
+  var check = done
+    ? '<div class="task-check done"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
+    : '<div class="task-check" onclick="event.stopPropagation();marquerFait('+t.ligne+')"></div>';
+  var meta = "";
+  if (t.urgence) meta += badgeUrgence(t.urgence);
+  if (t.groupe) meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.groupe+'</span>';
+  if (t.collab) meta += badgeCollab(t.collab);
+  if (t.metier) meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
+  var actions = done ? "" :
+    '<div class="task-actions">' +
+    '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>' +
+    '<button class="icon-btn" onclick="event.stopPropagation();supprimerTache('+t.ligne+')" style="color:#ffbbbb" title="Supprimer">✕</button>' +
+    '</div>';
+  return '<div class="task-row'+(done?" done-section":"") +'" onclick="ouvrirDetail('+t.ligne+')">' +
+    check +
+    '<div class="task-body">' +
+      '<div class="task-name'+(done?" done":"")+'">'+t.nom+'</div>' +
+      '<div class="task-meta">'+meta+'</div>' +
+    '</div>' +
+    actions +
+    '</div>';
+}
+
+function marquerFait(ligne) {
+  call({ action: "marquerTermine", ligne: ligne }, function() { chargerTaches(); });
+}
+
+function supprimerTache(ligne) {
+  if (!confirm("Supprimer cette tâche ?")) return;
+  call({ action: "supprimerTache", ligne: ligne }, function() { chargerTaches(); });
+}
+
+function ouvrirDetail(ligne) {
+  var t = taches.find(function(x) { return x.ligne === ligne; });
+  if (!t) return;
+  var html = '<div class="modal-overlay" onclick="fermerModal(event,this)"><div class="modal" onclick="event.stopPropagation()">';
+  html += '<h2>' + t.nom + '</h2>';
+  html += '<div style="font-size:13px;display:flex;flex-direction:column;gap:8px">';
+  html += ligne_detail("Groupe", t.groupe);
+  html += ligne_detail("Collab", t.collab);
+  html += ligne_detail("Priorité", t.urgence);
+  html += ligne_detail("Métier", t.metier);
+  if (t.notes) html += ligne_detail("Notes", t.notes);
+  html += '</div>';
+  html += '<div class="modal-actions">';
+  if (t.lien) html += '<a href="'+t.lien+'" target="_blank" class="btn">🔗 Lien</a>';
+  html += '<button class="btn" onclick="fermerModalDirect()">Fermer</button>';
+  html += '<button class="btn btn-primary" onclick="ouvrirFormulaire('+ligne+');fermerModalDirect()">Modifier</button>';
+  html += '</div></div></div>';
+  document.getElementById("modal-area").innerHTML = html;
+}
+
+function ligne_detail(label, val) {
+  if (!val) return "";
+  return '<div style="display:flex;gap:8px"><span style="color:#aaa;min-width:64px">'+label+'</span><span style="font-weight:500">'+val+'</span></div>';
+}
+
+function ouvrirFormulaire(ligne) {
+  var t = ligne ? taches.find(function(x) { return x.ligne === ligne; }) : null;
+  var html = '<div class="modal-overlay" onclick="fermerModal(event,this)"><div class="modal" onclick="event.stopPropagation()">';
+  html += '<h2>' + (t ? "Modifier la tâche" : "Nouvelle tâche") + '</h2>';
+  html += '<div class="form-row"><label>Quoi ?</label><input id="f-nom" placeholder="Nom de la tâche" value="'+(t?t.nom:"")+'"></div>';
+  html += '<div class="form-grid">';
+  html += '<div class="form-row"><label>Groupe</label><select id="f-groupe"><option value="">—</option>';
+  parametres.groupes.forEach(function(g) { html += '<option'+(t&&t.groupe===g?" selected":"")+'>'+g+'</option>'; });
+  html += '</select></div>';
+  html += '<div class="form-row"><label>Collab</label><select id="f-collab"><option value="">—</option>';
+  parametres.collabs.forEach(function(c) { html += '<option'+(t&&t.collab===c?" selected":"")+'>'+c+'</option>'; });
+  html += '</select></div></div>';
+  html += '<div class="form-grid">';
+  html += '<div class="form-row"><label>Priorité</label><select id="f-urgence"><option value="">—</option>';
+  parametres.urgences.forEach(function(u) { html += '<option'+(t&&t.urgence===u?" selected":"")+'>'+u+'</option>'; });
+  html += '</select></div>';
+  html += '<div class="form-row"><label>Métier</label><select id="f-metier"><option value="">—</option>';
+  parametres.metiers.forEach(function(m) { html += '<option'+(t&&t.metier===m?" selected":"")+'>'+m+'</option>'; });
+  html += '</select></div></div>';
+  html += '<div class="form-row"><label>Notes</label><textarea id="f-notes">'+(t&&t.notes?t.notes:"")+'</textarea></div>';
+  html += '<div class="form-row"><label>Lien (optionnel)</label><input id="f-lien" placeholder="https://…" value="'+(t&&t.lien?t.lien:"")+'"></div>';
+  html += '<div class="modal-actions">';
+  html += '<button class="btn" onclick="fermerModalDirect()">Annuler</button>';
+  html += '<button class="btn btn-primary" onclick="sauvegarder('+(ligne?ligne:"null")+')">Enregistrer</button>';
+  html += '</div></div></div>';
+  document.getElementById("modal-area").innerHTML = html;
+}
+
+function sauvegarder(ligne) {
+  var nom = document.getElementById("f-nom").value.trim();
+  if (!nom) { alert("Le nom est obligatoire."); return; }
+  var params = {
+    nom: nom,
+    groupe: document.getElementById("f-groupe").value,
+    collab: document.getElementById("f-collab").value,
+    urgence: document.getElementById("f-urgence").value,
+    metier: document.getElementById("f-metier").value,
+    notes: document.getElementById("f-notes").value,
+    lien: document.getElementById("f-lien").value
+  };
+  if (ligne) {
+    var t = taches.find(function(x) { return x.ligne === ligne; });
+    params.action = "modifierTache";
+    params.ligne = ligne;
+    params.statut = t ? t.statut : "🛠️ À faire";
+    params.date = t ? t.date : "";
+  } else {
+    params.action = "ajouterTache";
+  }
+  fermerModalDirect();
+  call(params, function() { chargerTaches(); });
+}
+
+function fermerModal(e, overlay) { if (e.target === overlay) fermerModalDirect(); }
+function fermerModalDirect() { document.getElementById("modal-area").innerHTML = ""; }
+
+init();
+</script>
+</body>
+</html>
