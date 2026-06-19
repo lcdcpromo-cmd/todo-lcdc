@@ -157,8 +157,14 @@ function badgeUrgence(u) {
 }
 
 function badgeCollab(c) {
-  var cl = COULEURS_COLLABS[c] || { bg: "#eee", color: "#555" };
-  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+c+'</span>';
+  if (!c) return "";
+  var noms = c.split(",").map(function(n) { return n.trim(); }).filter(Boolean);
+  var html = "";
+  noms.forEach(function(nom) {
+    var cl = COULEURS_COLLABS[nom] || { bg: "#eee", color: "#555" };
+    html += '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+nom+'</span>';
+  });
+  return html;
 }
 
 function call(params, callback) {
