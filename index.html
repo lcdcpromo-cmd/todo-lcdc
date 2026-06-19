@@ -97,9 +97,16 @@ var COULEURS_COLLABS = {
   { bg: "#FAEEDA", color: "#633806" }
 ];
 
+function normaliser(s) {
+  return (s || "").toString().trim().toLowerCase();
+}
+
 function badgeGroupe(g) {
-  var idx = parametres.groupes.indexOf(g);
-  var cl = PALETTE_GROUPES[idx % PALETTE_GROUPES.length] || { bg: "#eee", color: "#555" };
+  var idx = -1;
+  for (var i = 0; i < parametres.groupes.length; i++) {
+    if (normaliser(parametres.groupes[i]) === normaliser(g)) { idx = i; break; }
+  }
+  var cl = idx >= 0 ? PALETTE_GROUPES[idx % PALETTE_GROUPES.length] : { bg: "#eee", color: "#555" };
   return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+g+'</span>';
 }
 
@@ -232,7 +239,7 @@ function carteHTML(t, done) {
   if (t.groupe) meta += badgeGroupe(t.groupe);
   if (t.urgence) meta += badgeUrgence(t.urgence);
   if (t.collab) meta += badgeCollab(t.collab);
-  if (t.metier && t.metier.toLowerCase() !== "non défini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
+  if (t.metier && normaliser(t.metier) !== "non défini" && normaliser(t.metier) !== "non defini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
   var actions = done ? "" :
     '<div class="task-actions">' +
     '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>' +
