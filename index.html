@@ -1,4 +1,3 @@
-var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbycZj4K2acPYsiLEiWc0BaqF7suaDDDGmjKLsA_EM84f3hkcLRBllvA_P4s6JwMAHi3GA/exec";
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -48,11 +47,12 @@ var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbycZj4K2acPYsiLEiWc0Ba
     .btn-primary:hover { background: #333; }
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .error-msg { background: #FCEBEB; color: #A32D2D; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+    .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 1px solid #ddd; }
   </style>
 </head>
 <body>
 <div class="app">
-<div class="topbar">
+  <div class="topbar">
     <span class="topbar-title">📋 To-Do LCDC</span>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="avatars" id="avatars"></div>
@@ -80,6 +80,7 @@ var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbycZj4K2acPYsiLEiWc0Ba
 var parametres = { groupes: [], collabs: [], metiers: [], urgences: [], mails: {} };
 var taches = [];
 var filtres = { groupe: "", collab: "", urgence: "", metier: "" };
+var couleursGroupes = {};
 
 var COULEURS_COLLABS = {
   "CYRIL":  { bg: "#E6F1FB", color: "#185FA5" },
@@ -87,7 +88,8 @@ var COULEURS_COLLABS = {
   "MARION": { bg: "#E1F5EE", color: "#0F6E56" },
   "UGO":    { bg: "#FBEAF0", color: "#993556" }
 };
-  var PALETTE_GROUPES = [
+
+var PALETTE_GROUPES = [
   { bg: "#FBEAF0", color: "#993556" },
   { bg: "#E6F1FB", color: "#185FA5" },
   { bg: "#FAEEDA", color: "#854F0B" },
@@ -113,7 +115,13 @@ var PALETTE_CHOIX = [
   { bg: "#D3D1C7", color: "#2C2C2A" }
 ];
 
-var couleursGroupes = {};
+var COULEURS_URGENCES = [
+  { bg: "#FCEBEB", color: "#A32D2D" },
+  { bg: "#FAEEDA", color: "#854F0B" },
+  { bg: "#FFF9E6", color: "#92690A" },
+  { bg: "#E6F1FB", color: "#185FA5" },
+  { bg: "#EAF3DE", color: "#3B6D11" }
+];
 
 function normaliser(s) {
   return (s || "").toString()
@@ -142,13 +150,16 @@ function badgeGroupe(g) {
   return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+g+'</span>';
 }
 
-var COULEURS_URGENCES = [
-  { bg: "#FCEBEB", color: "#A32D2D" },
-  { bg: "#FAEEDA", color: "#854F0B" },
-  { bg: "#FFF9E6", color: "#92690A" },
-  { bg: "#E6F1FB", color: "#185FA5" },
-  { bg: "#EAF3DE", color: "#3B6D11" }
-];
+function badgeUrgence(u) {
+  var idx = parametres.urgences.indexOf(u);
+  var cl = COULEURS_URGENCES[idx] || { bg: "#eee", color: "#555" };
+  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+u+'</span>';
+}
+
+function badgeCollab(c) {
+  var cl = COULEURS_COLLABS[c] || { bg: "#eee", color: "#555" };
+  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+c+'</span>';
+}
 
 function call(params, callback) {
   var url = SCRIPT_URL + "?" + Object.keys(params).map(function(k) {
@@ -232,17 +243,6 @@ function appliquerFiltres() {
   afficherTaches();
 }
 
-function badgeUrgence(u) {
-  var idx = parametres.urgences.indexOf(u);
-  var cl = COULEURS_URGENCES[idx] || { bg: "#eee", color: "#555" };
-  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+u+'</span>';
-}
-
-function badgeCollab(c) {
-  var cl = COULEURS_COLLABS[c] || { bg: "#eee", color: "#555" };
-  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+c+'</span>';
-}
-
 function afficherTaches() {
   var actives = [], terminees = [];
   taches.forEach(function(t) {
@@ -276,7 +276,7 @@ function carteHTML(t, done) {
   if (t.groupe) meta += badgeGroupe(t.groupe);
   if (t.urgence) meta += badgeUrgence(t.urgence);
   if (t.collab) meta += badgeCollab(t.collab);
-  if (t.metier && normaliser(t.metier) !== "non défini" && normaliser(t.metier) !== "non defini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
+  if (t.metier && normaliser(t.metier) !== "non defini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
   var actions = done ? "" :
     '<div class="task-actions">' +
     '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>' +
@@ -394,7 +394,7 @@ function ouvrirPanneauCouleurs() {
     html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
     PALETTE_CHOIX.forEach(function(c) {
       var selectionne = c.bg.toLowerCase() === hexActuel.toLowerCase();
-      html += '<div onclick="choisirCouleur(\''+g.replace(/'/g,"\\'")+'\',\''+c.bg+'\',this)" style="width:28px;height:28px;border-radius:50%;background:'+c.bg+';cursor:pointer;border:'+(selectionne?'3px solid #1a1a1a':'1px solid #ddd')+'" title="'+c.bg+'"></div>';
+      html += '<div class="color-swatch" onclick="choisirCouleur(\''+g.replace(/'/g,"\\'")+'\',\''+c.bg+'\',this)" style="background:'+c.bg+';border:'+(selectionne?'3px solid #1a1a1a':'1px solid #ddd')+'" title="'+c.bg+'"></div>';
     });
     html += '</div></div>';
   });
@@ -415,5 +415,6 @@ function choisirCouleur(groupe, hex, el) {
 }
 
 init();
+</script>
 </body>
 </html>
