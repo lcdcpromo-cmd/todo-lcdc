@@ -18,6 +18,16 @@
     .chip { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; white-space: nowrap; transition: all .15s; }
     .chip:hover { border-color: #aaa; }
     .chip.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .toggle-bar { display: flex; gap: 6px; margin-bottom: 14px; }
+    .toggle-btn { font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid #ddd; background: #fff; color: #666; cursor: pointer; }
+    .toggle-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .group-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #fff; border-radius: 10px; border: 1px solid #ebebeb; cursor: pointer; margin-bottom: 6px; }
+    .group-name { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .group-count { font-size: 12px; color: #aaa; background: #f5f5f5; padding: 2px 9px; border-radius: 20px; }
+    .chevron { color: #bbb; font-size: 12px; transition: transform .15s; display: inline-block; }
+    .chevron.closed { transform: rotate(-90deg); }
+    .group-tasks { margin-left: 14px; margin-bottom: 10px; }
     .section-label { font-size: 11px; font-weight: 600; color: #999; letter-spacing: .06em; text-transform: uppercase; margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
     .task-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 13px; background: #fff; border-radius: 10px; border: 1px solid #ebebeb; margin-bottom: 6px; cursor: pointer; transition: border-color .12s; }
     .task-row:hover { border-color: #bbb; }
@@ -62,7 +72,12 @@
     </div>
   </div>
 
-<div class="filter-group">
+  <div class="toggle-bar">
+    <span class="toggle-btn active" id="btn-vue-liste" onclick="setVue('liste')">📋 Liste</span>
+    <span class="toggle-btn" id="btn-vue-groupe" onclick="setVue('groupe')">📁 Par groupe</span>
+  </div>
+
+  <div class="filter-group">
     <div class="filter-label">Groupe</div>
     <div id="filtres-groupe" class="filters-bar"></div>
   </div>
@@ -94,6 +109,8 @@ var parametres = { groupes: [], collabs: [], metiers: [], urgences: [], mails: {
 var taches = [];
 var filtres = { groupe: "", collab: "", urgence: "", metier: "" };
 var couleursGroupes = {};
+var vueActuelle = "liste";
+var groupesOuverts = {};
 
 var COULEURS_COLLABS = {
   "CYRIL":  { bg: "#E6F1FB", color: "#185FA5" },
@@ -144,7 +161,12 @@ function normaliser(s) {
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function badgeGroupe(g) {
+var COULEURS_COLLABS_NORM = {};
+Object.keys(COULEURS_COLLABS).forEach(function(k) {
+  COULEURS_COLLABS_NORM[normaliser(k)] = COULEURS_COLLABS[k];
+});
+
+function couleurGroupe(g) {
   var cle = normaliser(g);
   var hex = couleursGroupes[cle];
   var cl = null;
@@ -160,6 +182,11 @@ function badgeGroupe(g) {
     }
     cl = idx >= 0 ? PALETTE_GROUPES[idx % PALETTE_GROUPES.length] : { bg: "#eee", color: "#555" };
   }
+  return cl;
+}
+
+function badgeGroupe(g) {
+  var cl = couleurGroupe(g);
   return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+g+'</span>';
 }
 
@@ -168,11 +195,6 @@ function badgeUrgence(u) {
   var cl = COULEURS_URGENCES[idx] || { bg: "#eee", color: "#555" };
   return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+u+'</span>';
 }
-
-var COULEURS_COLLABS_NORM = {};
-Object.keys(COULEURS_COLLABS).forEach(function(k) {
-  COULEURS_COLLABS_NORM[normaliser(k)] = COULEURS_COLLABS[k];
-});
 
 function badgeCollab(c) {
   if (!c) return "";
@@ -267,7 +289,14 @@ function appliquerFiltres() {
   afficherTaches();
 }
 
-function afficherTaches() {
+function setVue(v) {
+  vueActuelle = v;
+  document.getElementById("btn-vue-liste").classList.toggle("active", v === "liste");
+  document.getElementById("btn-vue-groupe").classList.toggle("active", v === "groupe");
+  afficherTaches();
+}
+
+function tachesFiltrees() {
   var actives = [], terminees = [];
   taches.forEach(function(t) {
     if (filtres.groupe && t.groupe !== filtres.groupe) return;
@@ -277,6 +306,14 @@ function afficherTaches() {
     if (t.statut && t.statut.indexOf("Terminé") !== -1) terminees.push(t);
     else actives.push(t);
   });
+  return { actives: actives, terminees: terminees };
+}
+
+function afficherTaches() {
+  if (vueActuelle === "groupe") { afficherTachesGroupees(); return; }
+
+  var f = tachesFiltrees();
+  var actives = f.actives, terminees = f.terminees;
 
   var html = "";
   html += '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">' + actives.length + ' tâche' + (actives.length > 1 ? "s" : "") + '</span></div>';
@@ -292,12 +329,61 @@ function afficherTaches() {
   document.getElementById("liste-taches").innerHTML = html;
 }
 
+function afficherTachesGroupees() {
+  var f = tachesFiltrees();
+  var actives = f.actives;
+
+  var parGroupe = {};
+  var ordre = [];
+  actives.forEach(function(t) {
+    var cle = t.groupe || "Sans groupe";
+    if (!parGroupe[cle]) { parGroupe[cle] = []; ordre.push(cle); }
+    parGroupe[cle].push(t);
+  });
+
+  var html = '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">' + actives.length + ' tâche' + (actives.length > 1 ? "s" : "") + '</span></div>';
+
+  if (ordre.length === 0) {
+    html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
+  }
+
+  ordre.forEach(function(g) {
+    var cle = normaliser(g);
+    if (!(cle in groupesOuverts)) groupesOuverts[cle] = false;
+    var ouvert = groupesOuverts[cle];
+    var cl = couleurGroupe(g);
+    var liste = parGroupe[g];
+
+    html += '<div class="group-header" onclick="toggleGroupe(\''+cle.replace(/'/g,"\\'")+'\')">';
+    html += '<span class="group-name"><span class="group-dot" style="background:'+cl.color+'"></span>'+g+'</span>';
+    html += '<span style="display:flex;align-items:center;gap:8px">';
+    html += '<span class="group-count">'+liste.length+'</span>';
+    html += '<span class="chevron'+(ouvert?"":" closed")+'">▾</span>';
+    html += '</span></div>';
+
+    if (ouvert) {
+      html += '<div class="group-tasks">';
+      liste.forEach(function(t) { html += carteHTML(t, false); });
+      html += '</div>';
+    }
+  });
+
+  html += '<button class="add-btn" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
+
+  document.getElementById("liste-taches").innerHTML = html;
+}
+
+function toggleGroupe(cle) {
+  groupesOuverts[cle] = !groupesOuverts[cle];
+  afficherTachesGroupees();
+}
+
 function carteHTML(t, done) {
   var check = done
     ? '<div class="task-check done"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
     : '<div class="task-check" onclick="event.stopPropagation();marquerFait('+t.ligne+')"></div>';
   var meta = "";
-  if (t.groupe) meta += badgeGroupe(t.groupe);
+  if (vueActuelle !== "groupe" && t.groupe) meta += badgeGroupe(t.groupe);
   if (t.urgence) meta += badgeUrgence(t.urgence);
   if (t.collab) meta += badgeCollab(t.collab);
   if (t.metier && normaliser(t.metier) !== "non defini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
