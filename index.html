@@ -98,7 +98,11 @@ var COULEURS_COLLABS = {
 ];
 
 function normaliser(s) {
-  return (s || "").toString().trim().toLowerCase();
+  return (s || "").toString()
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function badgeGroupe(g) {
