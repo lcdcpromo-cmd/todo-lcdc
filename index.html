@@ -52,9 +52,12 @@ var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbycZj4K2acPYsiLEiWc0Ba
 </head>
 <body>
 <div class="app">
-  <div class="topbar">
+<div class="topbar">
     <span class="topbar-title">📋 To-Do LCDC</span>
-    <div class="avatars" id="avatars"></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="avatars" id="avatars"></div>
+      <button onclick="ouvrirPanneauCouleurs()" style="font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;color:#555">🎨 Couleurs</button>
+    </div>
   </div>
 
   <div id="filtres-groupe" class="filters-bar"></div>
@@ -97,6 +100,21 @@ var COULEURS_COLLABS = {
   { bg: "#FAEEDA", color: "#633806" }
 ];
 
+var PALETTE_CHOIX = [
+  { bg: "#FBEAF0", color: "#993556" },
+  { bg: "#E6F1FB", color: "#185FA5" },
+  { bg: "#FAEEDA", color: "#854F0B" },
+  { bg: "#EAF3DE", color: "#3B6D11" },
+  { bg: "#F1EFE8", color: "#444441" },
+  { bg: "#FCEBEB", color: "#A32D2D" },
+  { bg: "#E1F5EE", color: "#0F6E56" },
+  { bg: "#FAECE7", color: "#993C1D" },
+  { bg: "#EEEDFE", color: "#3C3489" },
+  { bg: "#D3D1C7", color: "#2C2C2A" }
+];
+
+var couleursGroupes = {};
+
 function normaliser(s) {
   return (s || "").toString()
     .replace(/\s+/g, " ")
@@ -106,11 +124,21 @@ function normaliser(s) {
 }
 
 function badgeGroupe(g) {
-  var idx = -1;
-  for (var i = 0; i < parametres.groupes.length; i++) {
-    if (normaliser(parametres.groupes[i]) === normaliser(g)) { idx = i; break; }
+  var cle = normaliser(g);
+  var hex = couleursGroupes[cle];
+  var cl = null;
+  if (hex) {
+    for (var i = 0; i < PALETTE_CHOIX.length; i++) {
+      if (PALETTE_CHOIX[i].bg.toLowerCase() === hex.toLowerCase()) { cl = PALETTE_CHOIX[i]; break; }
+    }
   }
-  var cl = idx >= 0 ? PALETTE_GROUPES[idx % PALETTE_GROUPES.length] : { bg: "#eee", color: "#555" };
+  if (!cl) {
+    var idx = -1;
+    for (var j = 0; j < parametres.groupes.length; j++) {
+      if (normaliser(parametres.groupes[j]) === cle) { idx = j; break; }
+    }
+    cl = idx >= 0 ? PALETTE_GROUPES[idx % PALETTE_GROUPES.length] : { bg: "#eee", color: "#555" };
+  }
   return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+g+'</span>';
 }
 
@@ -139,8 +167,13 @@ function afficherErreur(msg) {
 function init() {
   call({ action: "getParametres" }, function(p) {
     parametres = p;
-    construireFiltres();
-    chargerTaches();
+    call({ action: "getCouleurs" }, function(c) {
+      var norm = {};
+      Object.keys(c).forEach(function(k) { norm[normaliser(k)] = c[k]; });
+      couleursGroupes = norm;
+      construireFiltres();
+      chargerTaches();
+    });
   });
 }
 
@@ -349,7 +382,38 @@ function sauvegarder(ligne) {
 function fermerModal(e, overlay) { if (e.target === overlay) fermerModalDirect(); }
 function fermerModalDirect() { document.getElementById("modal-area").innerHTML = ""; }
 
+function ouvrirPanneauCouleurs() {
+  var html = '<div class="modal-overlay" onclick="fermerModal(event,this)"><div class="modal" onclick="event.stopPropagation()" style="max-width:480px">';
+  html += '<h2>🎨 Couleurs des groupes</h2>';
+  html += '<div style="display:flex;flex-direction:column;gap:14px;max-height:60vh;overflow-y:auto">';
+  parametres.groupes.forEach(function(g) {
+    var cle = normaliser(g);
+    var hexActuel = couleursGroupes[cle] || "";
+    html += '<div>';
+    html += '<div style="font-size:13px;font-weight:500;margin-bottom:6px">'+g+'</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    PALETTE_CHOIX.forEach(function(c) {
+      var selectionne = c.bg.toLowerCase() === hexActuel.toLowerCase();
+      html += '<div onclick="choisirCouleur(\''+g.replace(/'/g,"\\'")+'\',\''+c.bg+'\',this)" style="width:28px;height:28px;border-radius:50%;background:'+c.bg+';cursor:pointer;border:'+(selectionne?'3px solid #1a1a1a':'1px solid #ddd')+'" title="'+c.bg+'"></div>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  html += '<div class="modal-actions"><button class="btn" onclick="fermerModalDirect()">Fermer</button></div>';
+  html += '</div></div>';
+  document.getElementById("modal-area").innerHTML = html;
+}
+
+function choisirCouleur(groupe, hex, el) {
+  el.parentElement.querySelectorAll("div").forEach(function(d) { d.style.border = "1px solid #ddd"; });
+  el.style.border = "3px solid #1a1a1a";
+  var cle = normaliser(groupe);
+  couleursGroupes[cle] = hex;
+  call({ action: "sauverCouleur", groupe: groupe, couleur: hex }, function() {
+    afficherTaches();
+  });
+}
+
 init();
-</script>
 </body>
 </html>
