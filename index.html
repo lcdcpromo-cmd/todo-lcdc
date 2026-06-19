@@ -156,12 +156,17 @@ function badgeUrgence(u) {
   return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+u+'</span>';
 }
 
+var COULEURS_COLLABS_NORM = {};
+Object.keys(COULEURS_COLLABS).forEach(function(k) {
+  COULEURS_COLLABS_NORM[normaliser(k)] = COULEURS_COLLABS[k];
+});
+
 function badgeCollab(c) {
   if (!c) return "";
   var noms = c.split(",").map(function(n) { return n.trim(); }).filter(Boolean);
   var html = "";
   noms.forEach(function(nom) {
-    var cl = COULEURS_COLLABS[nom] || { bg: "#eee", color: "#555" };
+    var cl = COULEURS_COLLABS_NORM[normaliser(nom)] || { bg: "#eee", color: "#555" };
     html += '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+nom+'</span>';
   });
   return html;
