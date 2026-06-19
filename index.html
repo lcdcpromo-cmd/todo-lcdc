@@ -84,6 +84,24 @@ var COULEURS_COLLABS = {
   "MARION": { bg: "#E1F5EE", color: "#0F6E56" },
   "UGO":    { bg: "#FBEAF0", color: "#993556" }
 };
+  var PALETTE_GROUPES = [
+  { bg: "#FBEAF0", color: "#993556" },
+  { bg: "#E6F1FB", color: "#185FA5" },
+  { bg: "#FAEEDA", color: "#854F0B" },
+  { bg: "#EAF3DE", color: "#3B6D11" },
+  { bg: "#F1EFE8", color: "#444441" },
+  { bg: "#FCEBEB", color: "#A32D2D" },
+  { bg: "#E1F5EE", color: "#0F6E56" },
+  { bg: "#FAECE7", color: "#993C1D" },
+  { bg: "#EEEDFE", color: "#3C3489" },
+  { bg: "#FAEEDA", color: "#633806" }
+];
+
+function badgeGroupe(g) {
+  var idx = parametres.groupes.indexOf(g);
+  var cl = PALETTE_GROUPES[idx % PALETTE_GROUPES.length] || { bg: "#eee", color: "#555" };
+  return '<span class="badge" style="background:'+cl.bg+';color:'+cl.color+'">'+g+'</span>';
+}
 
 var COULEURS_URGENCES = [
   { bg: "#FCEBEB", color: "#A32D2D" },
@@ -211,10 +229,10 @@ function carteHTML(t, done) {
     ? '<div class="task-check done"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
     : '<div class="task-check" onclick="event.stopPropagation();marquerFait('+t.ligne+')"></div>';
   var meta = "";
+  if (t.groupe) meta += badgeGroupe(t.groupe);
   if (t.urgence) meta += badgeUrgence(t.urgence);
-  if (t.groupe) meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.groupe+'</span>';
   if (t.collab) meta += badgeCollab(t.collab);
-  if (t.metier) meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
+  if (t.metier && t.metier.toLowerCase() !== "non défini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
   var actions = done ? "" :
     '<div class="task-actions">' +
     '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>' +
