@@ -115,6 +115,7 @@ var filtres = { groupe: "", collab: "", urgence: "", metier: "" };
 var couleursGroupes = {};
 var vueActuelle = "liste";
 var groupesOuverts = {};
+var sectionAutoOuverte = false;
 
 // Drag & drop
 var dragSrcLigne = null;
@@ -300,33 +301,59 @@ function setVue(v) {
   afficherTaches();
 }
 
+function estAuto(t) {
+  return t.notes && t.notes.toString().trim().toLowerCase() === "généré automatiquement";
+}
+
 function tachesFiltrees() {
-  var actives = [], terminees = [];
+  var actives = [], auto = [], terminees = [];
   taches.forEach(function(t) {
     if (filtres.groupe && t.groupe !== filtres.groupe) return;
     if (filtres.collab && t.collab.indexOf(filtres.collab) === -1) return;
     if (filtres.urgence && t.urgence !== filtres.urgence) return;
     if (filtres.metier && t.metier !== filtres.metier) return;
     if (t.statut && t.statut.indexOf("Terminé") !== -1) terminees.push(t);
+    else if (estAuto(t)) auto.push(t);
     else actives.push(t);
   });
-  return { actives: actives, terminees: terminees };
+  return { actives: actives, auto: auto, terminees: terminees };
 }
 
 function afficherTaches() {
   if (vueActuelle === "groupe") { afficherTachesGroupees(); return; }
   var f = tachesFiltrees();
   var html = "";
+
+  // Section tâches manuelles
   html += '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">'+f.actives.length+' tâche'+(f.actives.length > 1 ? "s" : "")+'</span></div>';
-  if (f.actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
+  if (f.actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche manuelle active.</div>';
   f.actives.forEach(function(t) { html += carteHTML(t, false, true); });
   html += '<button class="add-btn" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
+
+  // Section tâches automatiques (repliable)
+  if (f.auto.length > 0) {
+    html += '<div class="section-label" style="margin-top:24px;cursor:pointer" onclick="toggleSectionAuto()">';
+    html += '🤖 Tâches automatiques <span style="font-weight:400;color:#bbb">'+f.auto.length+'</span>';
+    html += '<span style="margin-left:auto;font-size:12px;color:#bbb;transform:'+(sectionAutoOuverte?'':'rotate(-90deg)')+';display:inline-block;transition:transform .15s">▾</span>';
+    html += '</div>';
+    if (sectionAutoOuverte) {
+      f.auto.forEach(function(t) { html += carteHTML(t, false, true); });
+    }
+  }
+
+  // Section terminées
   if (f.terminees.length > 0) {
-    html += '<div class="section-label done-section">Terminées <span style="font-weight:400;color:#bbb">'+f.terminees.length+'</span></div>';
+    html += '<div class="section-label done-section" style="margin-top:20px">Terminées <span style="font-weight:400;color:#bbb">'+f.terminees.length+'</span></div>';
     f.terminees.forEach(function(t) { html += carteHTML(t, true, false); });
   }
+
   document.getElementById("liste-taches").innerHTML = html;
   activerDragDrop();
+}
+
+function toggleSectionAuto() {
+  sectionAutoOuverte = !sectionAutoOuverte;
+  afficherTaches();
 }
 
 function afficherTachesGroupees() {
