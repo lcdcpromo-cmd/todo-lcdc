@@ -30,8 +30,12 @@
     .chevron.closed { transform: rotate(-90deg); }
     .group-tasks { margin-left: 14px; margin-bottom: 10px; }
     .section-label { font-size: 11px; font-weight: 600; color: #999; letter-spacing: .06em; text-transform: uppercase; margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
-    .task-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 13px; background: #fff; border-radius: 10px; border: 1px solid #ebebeb; margin-bottom: 6px; cursor: pointer; transition: border-color .12s; }
+    .task-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 13px; background: #fff; border-radius: 10px; border: 1px solid #ebebeb; margin-bottom: 6px; cursor: pointer; transition: border-color .12s, opacity .15s, transform .15s; position: relative; }
     .task-row:hover { border-color: #bbb; }
+    .task-row.dragging { opacity: 0.4; transform: scale(0.98); border: 1.5px dashed #aaa; }
+    .task-row.drag-over { border-color: #1a1a1a; border-style: dashed; background: #f8f8f8; }
+    .drag-handle { color: #ccc; font-size: 14px; cursor: grab; padding: 2px 4px; margin-right: -4px; flex-shrink: 0; user-select: none; }
+    .drag-handle:hover { color: #888; }
     .task-check { width: 19px; height: 19px; border-radius: 50%; border: 2px solid #ccc; margin-top: 1px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
     .task-check.done { background: #1a1a1a; border-color: #1a1a1a; }
     .task-body { flex: 1; min-width: 0; }
@@ -63,7 +67,6 @@
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .error-msg { background: #FCEBEB; color: #A32D2D; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
     .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 1px solid #ddd; }
-    .hint { font-size: 11px; color: #aaa; margin-top: 3px; }
   </style>
 </head>
 <body>
@@ -112,6 +115,9 @@ var filtres = { groupe: "", collab: "", urgence: "", metier: "" };
 var couleursGroupes = {};
 var vueActuelle = "liste";
 var groupesOuverts = {};
+
+// Drag & drop
+var dragSrcLigne = null;
 
 var COULEURS_COLLABS = {
   "CYRIL":  { bg: "#E6F1FB", color: "#185FA5" },
@@ -205,9 +211,7 @@ function badgeCollab(c) {
   return html;
 }
 
-// Appel API avec mise à jour optimiste (instantané visuellement)
-function call(params, callback, optimiste) {
-  if (optimiste) optimiste();
+function call(params, callback) {
   var url = SCRIPT_URL + "?" + Object.keys(params).map(function(k) {
     return k + "=" + encodeURIComponent(params[k]);
   }).join("&");
@@ -215,10 +219,6 @@ function call(params, callback, optimiste) {
     .then(function(r) { return r.json(); })
     .then(function(data) { if (callback) callback(data); })
     .catch(function(e) { console.error(e); });
-}
-
-function afficherErreur(msg) {
-  document.getElementById("liste-taches").innerHTML = '<div class="error-msg">' + msg + '</div>';
 }
 
 function init() {
@@ -270,6 +270,12 @@ function construireFiltres() {
 function chargerTaches() {
   document.getElementById("liste-taches").innerHTML = '<div class="loading">Chargement…</div>';
   call({ action: "getTaches" }, function(data) {
+    // Trier par ordre si défini
+    data.sort(function(a, b) {
+      var oa = a.ordre > 0 ? a.ordre : 999999;
+      var ob = b.ordre > 0 ? b.ordre : 999999;
+      return oa - ob;
+    });
     taches = data;
     afficherTaches();
   });
@@ -313,13 +319,14 @@ function afficherTaches() {
   var html = "";
   html += '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">'+f.actives.length+' tâche'+(f.actives.length > 1 ? "s" : "")+'</span></div>';
   if (f.actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
-  f.actives.forEach(function(t) { html += carteHTML(t, false); });
+  f.actives.forEach(function(t) { html += carteHTML(t, false, true); });
   html += '<button class="add-btn" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
   if (f.terminees.length > 0) {
     html += '<div class="section-label done-section">Terminées <span style="font-weight:400;color:#bbb">'+f.terminees.length+'</span></div>';
-    f.terminees.forEach(function(t) { html += carteHTML(t, true); });
+    f.terminees.forEach(function(t) { html += carteHTML(t, true, false); });
   }
   document.getElementById("liste-taches").innerHTML = html;
+  activerDragDrop();
 }
 
 function afficherTachesGroupees() {
@@ -340,7 +347,7 @@ function afficherTachesGroupees() {
     html += '<div class="group-header" onclick="toggleGroupe(\''+cle.replace(/'/g,"\\'")+'\')"><span class="group-name"><span class="group-dot" style="background:'+cl.color+'"></span>'+g+'</span><span style="display:flex;align-items:center;gap:8px"><span class="group-count">'+parGroupe[g].length+'</span><span class="chevron'+(ouvert ? "" : " closed")+'">▾</span></span></div>';
     if (ouvert) {
       html += '<div class="group-tasks">';
-      parGroupe[g].forEach(function(t) { html += carteHTML(t, false); });
+      parGroupe[g].forEach(function(t) { html += carteHTML(t, false, false); });
       html += '</div>';
     }
   });
@@ -353,7 +360,8 @@ function toggleGroupe(cle) {
   afficherTachesGroupees();
 }
 
-function carteHTML(t, done) {
+function carteHTML(t, done, avecHandle) {
+  var handle = avecHandle ? '<div class="drag-handle" draggable="true" data-ligne="'+t.ligne+'" title="Réordonner">⠿</div>' : '';
   var check = done
     ? '<div class="task-check done"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
     : '<div class="task-check" onclick="event.stopPropagation();marquerFait('+t.ligne+')"></div>';
@@ -367,25 +375,88 @@ function carteHTML(t, done) {
     '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>'+
     '<button class="icon-btn" onclick="event.stopPropagation();supprimerTache('+t.ligne+')" style="color:#ffbbbb" title="Supprimer">✕</button>'+
     '</div>';
-  return '<div class="task-row'+(done?" done-section":"")+'" onclick="ouvrirDetail('+t.ligne+')">'+check+'<div class="task-body"><div class="task-name'+(done?" done":"")+'">'+t.nom+'</div><div class="task-meta">'+meta+'</div></div>'+actions+'</div>';
+  return '<div class="task-row'+(done?" done-section":"")+'" data-ligne="'+t.ligne+'" onclick="ouvrirDetail('+t.ligne+')">'+
+    handle+check+
+    '<div class="task-body"><div class="task-name'+(done?" done":"")+'">'+t.nom+'</div><div class="task-meta">'+meta+'</div></div>'+
+    actions+'</div>';
 }
 
-// ---- ACTIONS OPTIMISTES (instantané) ----
+// ---- DRAG & DROP ----
+function activerDragDrop() {
+  var handles = document.querySelectorAll(".drag-handle");
+  var rows = document.querySelectorAll(".task-row:not(.done-section)");
+
+  handles.forEach(function(handle) {
+    handle.addEventListener("dragstart", function(e) {
+      dragSrcLigne = parseInt(handle.getAttribute("data-ligne"));
+      var row = handle.closest(".task-row");
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    handle.addEventListener("dragend", function() {
+      document.querySelectorAll(".task-row").forEach(function(r) {
+        r.classList.remove("dragging", "drag-over");
+      });
+    });
+  });
+
+  rows.forEach(function(row) {
+    row.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      document.querySelectorAll(".task-row").forEach(function(r) { r.classList.remove("drag-over"); });
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("drop", function(e) {
+      e.preventDefault();
+      var targetLigne = parseInt(row.getAttribute("data-ligne"));
+      if (dragSrcLigne && dragSrcLigne !== targetLigne) {
+        reordonner(dragSrcLigne, targetLigne);
+      }
+      row.classList.remove("drag-over");
+    });
+  });
+}
+
+function reordonner(ligneSrc, ligneDest) {
+  // Trouver les indices dans le tableau taches
+  var idxSrc = taches.findIndex(function(t) { return t.ligne === ligneSrc; });
+  var idxDest = taches.findIndex(function(t) { return t.ligne === ligneDest; });
+  if (idxSrc < 0 || idxDest < 0) return;
+
+  // Déplacer dans le tableau local (uniquement les actives)
+  var actives = taches.filter(function(t) { return !t.statut || t.statut.indexOf("Terminé") === -1; });
+  var autres = taches.filter(function(t) { return t.statut && t.statut.indexOf("Terminé") !== -1; });
+
+  var iSrc = actives.findIndex(function(t) { return t.ligne === ligneSrc; });
+  var iDest = actives.findIndex(function(t) { return t.ligne === ligneDest; });
+  if (iSrc < 0 || iDest < 0) return;
+
+  var deplace = actives.splice(iSrc, 1)[0];
+  actives.splice(iDest, 0, deplace);
+
+  // Réassigner les numéros d'ordre
+  actives.forEach(function(t, i) { t.ordre = i + 1; });
+  taches = actives.concat(autres);
+
+  afficherTaches();
+
+  // Sauvegarder l'ordre dans Sheets en arrière-plan
+  var ordres = actives.map(function(t) { return t.ligne + ":" + t.ordre; }).join(",");
+  call({ action: "sauverOrdre", ordres: ordres }, null);
+}
+
+// ---- ACTIONS ----
 function marquerFait(ligne) {
-  // Mise à jour immédiate dans le tableau local
   var t = taches.find(function(x) { return x.ligne === ligne; });
   if (t) t.statut = "🎉 Terminé";
   afficherTaches();
-  // Sync en arrière-plan
   call({ action: "marquerTermine", ligne: ligne }, null);
 }
 
 function supprimerTache(ligne) {
   if (!confirm("Supprimer cette tâche ?")) return;
-  // Suppression immédiate localement
   taches = taches.filter(function(x) { return x.ligne !== ligne; });
   afficherTaches();
-  // Sync en arrière-plan
   call({ action: "supprimerTache", ligne: ligne }, null);
 }
 
@@ -427,8 +498,7 @@ function ouvrirFormulaire(ligne) {
   html += '<div class="form-row"><label>Métier</label><select id="f-metier"><option value="">—</option>';
   parametres.metiers.forEach(function(m) { html += '<option'+(t&&t.metier===m?" selected":"")+'>'+m+'</option>'; });
   html += '</select></div></div>';
-  // Sélection multiple pour collaborateurs
-  html += '<div class="form-row"><label>Collaborateurs <span style="font-weight:400;color:#bbb">(Ctrl+clic pour sélectionner plusieurs)</span></label>';
+  html += '<div class="form-row"><label>Collaborateurs <span style="font-weight:400;color:#bbb;font-size:11px">(Ctrl+clic pour plusieurs)</span></label>';
   html += '<select id="f-collab" multiple>';
   parametres.collabs.forEach(function(c) {
     var sel = collabsActuels.some(function(n){ return normaliser(n) === normaliser(c); });
@@ -450,32 +520,26 @@ function ouvrirFormulaire(ligne) {
 function sauvegarder(ligne) {
   var nom = document.getElementById("f-nom").value.trim();
   if (!nom) { alert("Le nom est obligatoire."); return; }
-
-  // Récupérer les collabs sélectionnés (liste multiple)
   var selCollab = document.getElementById("f-collab");
   var collabsChoisis = [];
   for (var i = 0; i < selCollab.options.length; i++) {
     if (selCollab.options[i].selected) collabsChoisis.push(selCollab.options[i].value);
   }
-  var collabStr = collabsChoisis.join(", ");
-
   var params = {
     nom: nom,
     groupe: document.getElementById("f-groupe").value,
-    collab: collabStr,
+    collab: collabsChoisis.join(", "),
     urgence: document.getElementById("f-urgence").value,
     metier: document.getElementById("f-metier").value,
     notes: document.getElementById("f-notes").value,
     lien: document.getElementById("f-lien").value
   };
-
   if (ligne) {
     var t = taches.find(function(x) { return x.ligne === ligne; });
     params.action = "modifierTache";
     params.ligne = ligne;
     params.statut = t ? t.statut : "🛠️ À faire";
     params.date = t ? t.date : "";
-    // Mise à jour locale instantanée
     if (t) {
       t.nom = params.nom; t.groupe = params.groupe;
       t.collab = params.collab; t.urgence = params.urgence;
@@ -484,15 +548,9 @@ function sauvegarder(ligne) {
   } else {
     params.action = "ajouterTache";
   }
-
   fermerModalDirect();
   afficherTaches();
-
-  // Envoi mail si collab assigné (géré côté Apps Script)
-  call(params, function(res) {
-    // Si c'est un ajout, on recharge pour avoir le vrai numéro de ligne
-    if (!ligne) chargerTaches();
-  });
+  call(params, function() { if (!ligne) chargerTaches(); });
 }
 
 function fermerModal(e, overlay) { if (e.target === overlay) fermerModalDirect(); }
