@@ -550,6 +550,7 @@ function ouvrirFormulaire(ligne) {
   html += '<div class="form-row"><label>Priorité</label><select id="f-urgence"><option value="">—</option>';
   parametres.urgences.forEach(function(u) { html += '<option'+(t&&t.urgence===u?" selected":"")+'>'+u+'</option>'; });
   html += '</select></div>';
+  html += '<div class="form-row"><label>Date limite (optionnel)</label><input type="date" id="f-date" value="'+(t&&t.date?t.date:"")+'"></div>';
   html += '<div class="form-row"><label>Notes</label><textarea id="f-notes">'+(t&&t.notes?t.notes:"")+'</textarea></div>';
   html += '<div class="form-row"><label>Lien (optionnel)</label><input id="f-lien" placeholder="https://…" value="'+(t&&t.lien?t.lien:"")+'"></div>';
   html += '<div class="modal-actions">';
@@ -574,7 +575,8 @@ function sauvegarder(ligne) {
     urgence: document.getElementById("f-urgence").value,
     metier: document.getElementById("f-metier").value,
     notes: document.getElementById("f-notes").value,
-    lien: document.getElementById("f-lien").value
+    lien: document.getElementById("f-lien").value,
+    date: document.getElementById("f-date").value
   };
   if (ligne) {
     var t = taches.find(function(x) { return x.ligne === ligne; });
