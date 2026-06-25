@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>To-Do LCDC</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a1a1a'/><path d='M14 20h36M14 32h24M14 44h28' stroke='white' stroke-width='5' stroke-linecap='round'/><circle cx='50' cy='44' r='8' fill='%234ade80'/><path d='M46 44l3 3 5-5' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
@@ -51,6 +52,8 @@
     .form-row label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 500; }
     .form-row input, .form-row select, .form-row textarea { width: 100%; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid #e0e0e0; background: #fafafa; color: #1a1a1a; font-family: inherit; }
     .form-row textarea { height: 72px; resize: vertical; }
+    .form-row select[multiple] { height: 110px; padding: 4px; }
+    .form-row select[multiple] option { padding: 5px 8px; border-radius: 4px; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .btn { font-size: 13px; padding: 7px 16px; border-radius: 8px; border: 1px solid #e0e0e0; cursor: pointer; font-family: inherit; background: #fff; color: #444; }
@@ -60,6 +63,7 @@
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .error-msg { background: #FCEBEB; color: #A32D2D; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
     .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 1px solid #ddd; }
+    .hint { font-size: 11px; color: #aaa; margin-top: 3px; }
   </style>
 </head>
 <body>
@@ -81,12 +85,10 @@
     <div class="filter-label">Groupe</div>
     <div id="filtres-groupe" class="filters-bar"></div>
   </div>
-
   <div class="filter-group">
     <div class="filter-label">Collaborateur</div>
     <div id="filtres-collab" class="filters-bar"></div>
   </div>
-
   <div class="filter-group">
     <div class="filter-label">Priorité &amp; métier</div>
     <div style="display:flex; gap: 12px; align-items:center">
@@ -99,7 +101,6 @@
 
   <div id="liste-taches"><div class="loading">Chargement…</div></div>
 </div>
-
 <div id="modal-area"></div>
 
 <script>
@@ -154,10 +155,7 @@ var COULEURS_URGENCES = [
 ];
 
 function normaliser(s) {
-  return (s || "").toString()
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase()
+  return (s || "").toString().replace(/\s+/g, " ").trim().toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
@@ -207,14 +205,16 @@ function badgeCollab(c) {
   return html;
 }
 
-function call(params, callback) {
+// Appel API avec mise à jour optimiste (instantané visuellement)
+function call(params, callback, optimiste) {
+  if (optimiste) optimiste();
   var url = SCRIPT_URL + "?" + Object.keys(params).map(function(k) {
     return k + "=" + encodeURIComponent(params[k]);
   }).join("&");
   fetch(url)
     .then(function(r) { return r.json(); })
-    .then(callback)
-    .catch(function(e) { console.error(e); afficherErreur("Impossible de contacter Google Sheets."); });
+    .then(function(data) { if (callback) callback(data); })
+    .catch(function(e) { console.error(e); });
 }
 
 function afficherErreur(msg) {
@@ -262,8 +262,7 @@ function construireFiltres() {
   var hA = "";
   parametres.collabs.forEach(function(c) {
     var cl = COULEURS_COLLABS[c] || { bg: "#eee", color: "#555" };
-    var initiales = c.substring(0,2);
-    hA += '<div class="avatar" style="background:'+cl.bg+';color:'+cl.color+'" title="'+c+'">'+initiales+'</div>';
+    hA += '<div class="avatar" style="background:'+cl.bg+';color:'+cl.color+'" title="'+c+'">'+c.substring(0,2)+'</div>';
   });
   document.getElementById("avatars").innerHTML = hA;
 }
@@ -278,8 +277,7 @@ function chargerTaches() {
 
 function setFiltre(type, val, el) {
   filtres[type] = val;
-  var bar = el.parentElement;
-  bar.querySelectorAll(".chip").forEach(function(c) { c.classList.remove("active"); });
+  el.parentElement.querySelectorAll(".chip").forEach(function(c) { c.classList.remove("active"); });
   el.classList.add("active");
   afficherTaches();
 }
@@ -300,7 +298,7 @@ function tachesFiltrees() {
   var actives = [], terminees = [];
   taches.forEach(function(t) {
     if (filtres.groupe && t.groupe !== filtres.groupe) return;
-    if (filtres.collab && t.collab !== filtres.collab) return;
+    if (filtres.collab && t.collab.indexOf(filtres.collab) === -1) return;
     if (filtres.urgence && t.urgence !== filtres.urgence) return;
     if (filtres.metier && t.metier !== filtres.metier) return;
     if (t.statut && t.statut.indexOf("Terminé") !== -1) terminees.push(t);
@@ -311,65 +309,42 @@ function tachesFiltrees() {
 
 function afficherTaches() {
   if (vueActuelle === "groupe") { afficherTachesGroupees(); return; }
-
   var f = tachesFiltrees();
-  var actives = f.actives, terminees = f.terminees;
-
   var html = "";
-  html += '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">' + actives.length + ' tâche' + (actives.length > 1 ? "s" : "") + '</span></div>';
-  if (actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
-  actives.forEach(function(t) { html += carteHTML(t, false); });
+  html += '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">'+f.actives.length+' tâche'+(f.actives.length > 1 ? "s" : "")+'</span></div>';
+  if (f.actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
+  f.actives.forEach(function(t) { html += carteHTML(t, false); });
   html += '<button class="add-btn" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
-
-  if (terminees.length > 0) {
-    html += '<div class="section-label done-section">Terminées <span style="font-weight:400;color:#bbb">' + terminees.length + '</span></div>';
-    terminees.forEach(function(t) { html += carteHTML(t, true); });
+  if (f.terminees.length > 0) {
+    html += '<div class="section-label done-section">Terminées <span style="font-weight:400;color:#bbb">'+f.terminees.length+'</span></div>';
+    f.terminees.forEach(function(t) { html += carteHTML(t, true); });
   }
-
   document.getElementById("liste-taches").innerHTML = html;
 }
 
 function afficherTachesGroupees() {
   var f = tachesFiltrees();
-  var actives = f.actives;
-
-  var parGroupe = {};
-  var ordre = [];
-  actives.forEach(function(t) {
+  var parGroupe = {}, ordre = [];
+  f.actives.forEach(function(t) {
     var cle = t.groupe || "Sans groupe";
     if (!parGroupe[cle]) { parGroupe[cle] = []; ordre.push(cle); }
     parGroupe[cle].push(t);
   });
-
-  var html = '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">' + actives.length + ' tâche' + (actives.length > 1 ? "s" : "") + '</span></div>';
-
-  if (ordre.length === 0) {
-    html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
-  }
-
+  var html = '<div class="section-label">À faire <span style="font-weight:400;color:#bbb">'+f.actives.length+' tâche'+(f.actives.length > 1 ? "s" : "")+'</span></div>';
+  if (ordre.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche active.</div>';
   ordre.forEach(function(g) {
     var cle = normaliser(g);
     if (!(cle in groupesOuverts)) groupesOuverts[cle] = false;
     var ouvert = groupesOuverts[cle];
     var cl = couleurGroupe(g);
-    var liste = parGroupe[g];
-
-    html += '<div class="group-header" onclick="toggleGroupe(\''+cle.replace(/'/g,"\\'")+'\')">';
-    html += '<span class="group-name"><span class="group-dot" style="background:'+cl.color+'"></span>'+g+'</span>';
-    html += '<span style="display:flex;align-items:center;gap:8px">';
-    html += '<span class="group-count">'+liste.length+'</span>';
-    html += '<span class="chevron'+(ouvert?"":" closed")+'">▾</span>';
-    html += '</span></div>';
-
+    html += '<div class="group-header" onclick="toggleGroupe(\''+cle.replace(/'/g,"\\'")+'\')"><span class="group-name"><span class="group-dot" style="background:'+cl.color+'"></span>'+g+'</span><span style="display:flex;align-items:center;gap:8px"><span class="group-count">'+parGroupe[g].length+'</span><span class="chevron'+(ouvert ? "" : " closed")+'">▾</span></span></div>';
     if (ouvert) {
       html += '<div class="group-tasks">';
-      liste.forEach(function(t) { html += carteHTML(t, false); });
+      parGroupe[g].forEach(function(t) { html += carteHTML(t, false); });
       html += '</div>';
     }
   });
-
   html += '<button class="add-btn" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
-
   document.getElementById("liste-taches").innerHTML = html;
 }
 
@@ -388,37 +363,40 @@ function carteHTML(t, done) {
   if (t.collab) meta += badgeCollab(t.collab);
   if (t.metier && normaliser(t.metier) !== "non defini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
   var actions = done ? "" :
-    '<div class="task-actions">' +
-    '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>' +
-    '<button class="icon-btn" onclick="event.stopPropagation();supprimerTache('+t.ligne+')" style="color:#ffbbbb" title="Supprimer">✕</button>' +
+    '<div class="task-actions">'+
+    '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>'+
+    '<button class="icon-btn" onclick="event.stopPropagation();supprimerTache('+t.ligne+')" style="color:#ffbbbb" title="Supprimer">✕</button>'+
     '</div>';
-  return '<div class="task-row'+(done?" done-section":"") +'" onclick="ouvrirDetail('+t.ligne+')">' +
-    check +
-    '<div class="task-body">' +
-      '<div class="task-name'+(done?" done":"")+'">'+t.nom+'</div>' +
-      '<div class="task-meta">'+meta+'</div>' +
-    '</div>' +
-    actions +
-    '</div>';
+  return '<div class="task-row'+(done?" done-section":"")+'" onclick="ouvrirDetail('+t.ligne+')">'+check+'<div class="task-body"><div class="task-name'+(done?" done":"")+'">'+t.nom+'</div><div class="task-meta">'+meta+'</div></div>'+actions+'</div>';
 }
 
+// ---- ACTIONS OPTIMISTES (instantané) ----
 function marquerFait(ligne) {
-  call({ action: "marquerTermine", ligne: ligne }, function() { chargerTaches(); });
+  // Mise à jour immédiate dans le tableau local
+  var t = taches.find(function(x) { return x.ligne === ligne; });
+  if (t) t.statut = "🎉 Terminé";
+  afficherTaches();
+  // Sync en arrière-plan
+  call({ action: "marquerTermine", ligne: ligne }, null);
 }
 
 function supprimerTache(ligne) {
   if (!confirm("Supprimer cette tâche ?")) return;
-  call({ action: "supprimerTache", ligne: ligne }, function() { chargerTaches(); });
+  // Suppression immédiate localement
+  taches = taches.filter(function(x) { return x.ligne !== ligne; });
+  afficherTaches();
+  // Sync en arrière-plan
+  call({ action: "supprimerTache", ligne: ligne }, null);
 }
 
 function ouvrirDetail(ligne) {
   var t = taches.find(function(x) { return x.ligne === ligne; });
   if (!t) return;
   var html = '<div class="modal-overlay" onclick="fermerModal(event,this)"><div class="modal" onclick="event.stopPropagation()">';
-  html += '<h2>' + t.nom + '</h2>';
+  html += '<h2>'+t.nom+'</h2>';
   html += '<div style="font-size:13px;display:flex;flex-direction:column;gap:8px">';
   html += ligne_detail("Groupe", t.groupe);
-  html += ligne_detail("Collab", t.collab);
+  html += ligne_detail("Collabs", t.collab);
   html += ligne_detail("Priorité", t.urgence);
   html += ligne_detail("Métier", t.metier);
   if (t.notes) html += ligne_detail("Notes", t.notes);
@@ -438,23 +416,28 @@ function ligne_detail(label, val) {
 
 function ouvrirFormulaire(ligne) {
   var t = ligne ? taches.find(function(x) { return x.ligne === ligne; }) : null;
+  var collabsActuels = t && t.collab ? t.collab.split(",").map(function(n){ return n.trim(); }) : [];
   var html = '<div class="modal-overlay" onclick="fermerModal(event,this)"><div class="modal" onclick="event.stopPropagation()">';
-  html += '<h2>' + (t ? "Modifier la tâche" : "Nouvelle tâche") + '</h2>';
+  html += '<h2>'+(t ? "Modifier la tâche" : "Nouvelle tâche")+'</h2>';
   html += '<div class="form-row"><label>Quoi ?</label><input id="f-nom" placeholder="Nom de la tâche" value="'+(t?t.nom:"")+'"></div>';
   html += '<div class="form-grid">';
   html += '<div class="form-row"><label>Groupe</label><select id="f-groupe"><option value="">—</option>';
   parametres.groupes.forEach(function(g) { html += '<option'+(t&&t.groupe===g?" selected":"")+'>'+g+'</option>'; });
   html += '</select></div>';
-  html += '<div class="form-row"><label>Collab</label><select id="f-collab"><option value="">—</option>';
-  parametres.collabs.forEach(function(c) { html += '<option'+(t&&t.collab===c?" selected":"")+'>'+c+'</option>'; });
-  html += '</select></div></div>';
-  html += '<div class="form-grid">';
-  html += '<div class="form-row"><label>Priorité</label><select id="f-urgence"><option value="">—</option>';
-  parametres.urgences.forEach(function(u) { html += '<option'+(t&&t.urgence===u?" selected":"")+'>'+u+'</option>'; });
-  html += '</select></div>';
   html += '<div class="form-row"><label>Métier</label><select id="f-metier"><option value="">—</option>';
   parametres.metiers.forEach(function(m) { html += '<option'+(t&&t.metier===m?" selected":"")+'>'+m+'</option>'; });
   html += '</select></div></div>';
+  // Sélection multiple pour collaborateurs
+  html += '<div class="form-row"><label>Collaborateurs <span style="font-weight:400;color:#bbb">(Ctrl+clic pour sélectionner plusieurs)</span></label>';
+  html += '<select id="f-collab" multiple>';
+  parametres.collabs.forEach(function(c) {
+    var sel = collabsActuels.some(function(n){ return normaliser(n) === normaliser(c); });
+    html += '<option'+(sel?" selected":"")+'>'+c+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div class="form-row"><label>Priorité</label><select id="f-urgence"><option value="">—</option>';
+  parametres.urgences.forEach(function(u) { html += '<option'+(t&&t.urgence===u?" selected":"")+'>'+u+'</option>'; });
+  html += '</select></div>';
   html += '<div class="form-row"><label>Notes</label><textarea id="f-notes">'+(t&&t.notes?t.notes:"")+'</textarea></div>';
   html += '<div class="form-row"><label>Lien (optionnel)</label><input id="f-lien" placeholder="https://…" value="'+(t&&t.lien?t.lien:"")+'"></div>';
   html += '<div class="modal-actions">';
@@ -467,26 +450,49 @@ function ouvrirFormulaire(ligne) {
 function sauvegarder(ligne) {
   var nom = document.getElementById("f-nom").value.trim();
   if (!nom) { alert("Le nom est obligatoire."); return; }
+
+  // Récupérer les collabs sélectionnés (liste multiple)
+  var selCollab = document.getElementById("f-collab");
+  var collabsChoisis = [];
+  for (var i = 0; i < selCollab.options.length; i++) {
+    if (selCollab.options[i].selected) collabsChoisis.push(selCollab.options[i].value);
+  }
+  var collabStr = collabsChoisis.join(", ");
+
   var params = {
     nom: nom,
     groupe: document.getElementById("f-groupe").value,
-    collab: document.getElementById("f-collab").value,
+    collab: collabStr,
     urgence: document.getElementById("f-urgence").value,
     metier: document.getElementById("f-metier").value,
     notes: document.getElementById("f-notes").value,
     lien: document.getElementById("f-lien").value
   };
+
   if (ligne) {
     var t = taches.find(function(x) { return x.ligne === ligne; });
     params.action = "modifierTache";
     params.ligne = ligne;
     params.statut = t ? t.statut : "🛠️ À faire";
     params.date = t ? t.date : "";
+    // Mise à jour locale instantanée
+    if (t) {
+      t.nom = params.nom; t.groupe = params.groupe;
+      t.collab = params.collab; t.urgence = params.urgence;
+      t.metier = params.metier; t.notes = params.notes; t.lien = params.lien;
+    }
   } else {
     params.action = "ajouterTache";
   }
+
   fermerModalDirect();
-  call(params, function() { chargerTaches(); });
+  afficherTaches();
+
+  // Envoi mail si collab assigné (géré côté Apps Script)
+  call(params, function(res) {
+    // Si c'est un ajout, on recharge pour avoir le vrai numéro de ligne
+    if (!ligne) chargerTaches();
+  });
 }
 
 function fermerModal(e, overlay) { if (e.target === overlay) fermerModalDirect(); }
@@ -499,29 +505,22 @@ function ouvrirPanneauCouleurs() {
   parametres.groupes.forEach(function(g) {
     var cle = normaliser(g);
     var hexActuel = couleursGroupes[cle] || "";
-    html += '<div>';
-    html += '<div style="font-size:13px;font-weight:500;margin-bottom:6px">'+g+'</div>';
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    html += '<div><div style="font-size:13px;font-weight:500;margin-bottom:6px">'+g+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
     PALETTE_CHOIX.forEach(function(c) {
-      var selectionne = c.bg.toLowerCase() === hexActuel.toLowerCase();
-      html += '<div class="color-swatch" onclick="choisirCouleur(\''+g.replace(/'/g,"\\'")+'\',\''+c.bg+'\',this)" style="background:'+c.bg+';border:'+(selectionne?'3px solid #1a1a1a':'1px solid #ddd')+'" title="'+c.bg+'"></div>';
+      var sel = c.bg.toLowerCase() === hexActuel.toLowerCase();
+      html += '<div class="color-swatch" onclick="choisirCouleur(\''+g.replace(/'/g,"\\'")+'\',\''+c.bg+'\',this)" style="background:'+c.bg+';border:'+(sel?'3px solid #1a1a1a':'1px solid #ddd')+'" title="'+c.bg+'"></div>';
     });
     html += '</div></div>';
   });
-  html += '</div>';
-  html += '<div class="modal-actions"><button class="btn" onclick="fermerModalDirect()">Fermer</button></div>';
-  html += '</div></div>';
+  html += '</div><div class="modal-actions"><button class="btn" onclick="fermerModalDirect()">Fermer</button></div></div></div>';
   document.getElementById("modal-area").innerHTML = html;
 }
 
 function choisirCouleur(groupe, hex, el) {
   el.parentElement.querySelectorAll("div").forEach(function(d) { d.style.border = "1px solid #ddd"; });
   el.style.border = "3px solid #1a1a1a";
-  var cle = normaliser(groupe);
-  couleursGroupes[cle] = hex;
-  call({ action: "sauverCouleur", groupe: groupe, couleur: hex }, function() {
-    afficherTaches();
-  });
+  couleursGroupes[normaliser(groupe)] = hex;
+  call({ action: "sauverCouleur", groupe: groupe, couleur: hex }, function() { afficherTaches(); });
 }
 
 init();
