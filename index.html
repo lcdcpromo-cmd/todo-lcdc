@@ -119,6 +119,7 @@ var vueActuelle = "liste";
 var groupesOuverts = {};
 var sectionAutoOuverte = false;
 var sectionTermineesOuverte = false;
+var triOrdre = "desc"; // "desc" = plus récent en haut, "asc" = plus ancien en haut
 
 // Drag & drop
 var dragSrcLigne = null;
@@ -275,10 +276,10 @@ function chargerTaches() {
   document.getElementById("liste-taches").innerHTML = '<div class="loading">Chargement…</div>';
   call({ action: "getTaches" }, function(data) {
     // Trier par ordre si défini
-    data.sort(function(a, b) {
+data.sort(function(a, b) {
       var oa = a.ordre > 0 ? a.ordre : 999999;
       var ob = b.ordre > 0 ? b.ordre : 999999;
-      return oa - ob;
+      return triOrdre === "desc" ? ob - oa : oa - ob;
     });
     taches = data;
     afficherTaches();
@@ -328,7 +329,10 @@ function afficherTaches() {
   var html = "";
 
   // Bouton "Ajouter" en haut, bien visible
-  html += '<button class="add-btn-top" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
+ html += '<div style="display:flex;gap:8px;align-items:center">';
+  html += '<button class="add-btn-top" style="flex:1" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
+  html += '<button onclick="toggleTri()" style="font-size:12px;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer;white-space:nowrap" title="Changer l\'ordre">'+(triOrdre==="desc"?"↓ Plus récent":"↑ Plus ancien")+'</button>';
+  html += '</div>';
 
   // Section tâches manuelles
   html += '<div class="section-label" style="margin-top:16px">À faire <span style="font-weight:400;color:#bbb">'+f.actives.length+' tâche'+(f.actives.length > 1 ? "s" : "")+'</span></div>';
@@ -366,7 +370,16 @@ function toggleSectionAuto() {
   afficherTaches();
 }
 
-function toggleSectionTerminees() {
+function toggleTri() {
+  triOrdre = triOrdre === "desc" ? "asc" : "desc";
+  taches.sort(function(a, b) {
+    var oa = a.ordre > 0 ? a.ordre : 999999;
+    var ob = b.ordre > 0 ? b.ordre : 999999;
+    return triOrdre === "desc" ? ob - oa : oa - ob;
+  });
+  afficherTaches();
+}
+  function toggleSectionTerminees() {
   sectionTermineesOuverte = !sectionTermineesOuverte;
   afficherTaches();
 }
