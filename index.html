@@ -48,7 +48,7 @@
     .icon-btn:hover { background: #f5f5f5; color: #555; }
     .add-btn { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 10px; border: 1.5px dashed #ddd; color: #999; font-size: 13px; cursor: pointer; background: transparent; width: 100%; margin-top: 4px; transition: all .15s; }
     .add-btn:hover { border-color: #aaa; color: #555; }
-    .add-btn-top { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; border: none; background: #1a1a1a; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%; transition: all .15s; font-family: inherit; }
+    .add-btn-top { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; border: none; background: #6b7280; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; width: 100%; transition: all .15s; font-family: inherit; }
     .add-btn-top:hover { background: #4b5563; }
     .done-section { opacity: .55; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
@@ -63,14 +63,14 @@
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .btn { font-size: 13px; padding: 7px 16px; border-radius: 8px; border: 1px solid #e0e0e0; cursor: pointer; font-family: inherit; background: #fff; color: #444; }
-    .btn-primary { background: #6b7280; color: #fff; border-color: #1a1a1a; }
+    .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
     .btn:hover { background: #f5f5f5; }
     .btn-primary:hover { background: #333; }
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .error-msg { background: #FCEBEB; color: #A32D2D; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
     .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 1px solid #ddd; }
     @keyframes popIn { 0% { transform: scale(0) rotate(-10deg); opacity:0; } 70% { transform: scale(1.2) rotate(3deg); } 100% { transform: scale(1) rotate(0deg); opacity:1; } }
-    @keyframes slideUp { 0% { transform: translateY(0); opacity:1; } 80% { transform: translateY(-40px); opacity:1; } 100% { transform: translateY(-60px); opacity:0; } }
+    @keyframes slideUp { 0% { transform: translateX(-50%) translateY(0); opacity:1; } 80% { transform: translateX(-50%) translateY(-40px); opacity:1; } 100% { transform: translateX(-50%) translateY(-60px); opacity:0; } }
     .bravo-msg { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 15px; font-weight: 600; z-index: 999; animation: slideUp 2.2s ease forwards; pointer-events: none; white-space: nowrap; }
     .task-check.celebrating { animation: popIn 0.4s cubic-bezier(.36,.07,.19,.97); background: #1a1a1a; border-color: #1a1a1a; }
   </style>
@@ -123,9 +123,7 @@ var vueActuelle = "liste";
 var groupesOuverts = {};
 var sectionAutoOuverte = false;
 var sectionTermineesOuverte = false;
-var triOrdre = "desc"; // "desc" = plus récent en haut, "asc" = plus ancien en haut
-
-// Drag & drop
+var triOrdre = "desc";
 var dragSrcLigne = null;
 
 var COULEURS_COLLABS = {
@@ -135,6 +133,7 @@ var COULEURS_COLLABS = {
   "UGO":    { bg: "#FBEAF0", color: "#993556" },
   "CLAUDE": { bg: "#FDEDE3", color: "#B5481E" }
 };
+
 var PALETTE_GROUPES = [
   { bg: "#FBEAF0", color: "#993556" },
   { bg: "#E6F1FB", color: "#185FA5" },
@@ -167,6 +166,19 @@ var COULEURS_URGENCES = [
   { bg: "#FFF9E6", color: "#92690A" },
   { bg: "#E6F1FB", color: "#185FA5" },
   { bg: "#EAF3DE", color: "#3B6D11" }
+];
+
+var MESSAGES_BRAVO = [
+  "You rock ! 🤘",
+  "Trop fort(e) ! 💪",
+  "Bien joué ! ✨",
+  "C'est dans la boîte ! 📦",
+  "Mission accomplie ! 🎯",
+  "On est les meilleurs ! 🏆",
+  "LCDC assure ! 🎸",
+  "Legendary ! 🌟",
+  "Bam ! Coché ! ✅",
+  "Et hop, c'est plié ! 🎉"
 ];
 
 function normaliser(s) {
@@ -279,8 +291,7 @@ function construireFiltres() {
 function chargerTaches() {
   document.getElementById("liste-taches").innerHTML = '<div class="loading">Chargement…</div>';
   call({ action: "getTaches" }, function(data) {
-    // Trier par ordre si défini
-data.sort(function(a, b) {
+    data.sort(function(a, b) {
       var oa = a.ordre > 0 ? a.ordre : 999999;
       var ob = b.ordre > 0 ? b.ordre : 999999;
       return triOrdre === "desc" ? ob - oa : oa - ob;
@@ -309,6 +320,16 @@ function setVue(v) {
   afficherTaches();
 }
 
+function toggleTri() {
+  triOrdre = triOrdre === "desc" ? "asc" : "desc";
+  taches.sort(function(a, b) {
+    var oa = a.ordre > 0 ? a.ordre : 999999;
+    var ob = b.ordre > 0 ? b.ordre : 999999;
+    return triOrdre === "desc" ? ob - oa : oa - ob;
+  });
+  afficherTaches();
+}
+
 function estAuto(t) {
   return t.notes && t.notes.toString().trim().toLowerCase() === "généré automatiquement";
 }
@@ -332,18 +353,15 @@ function afficherTaches() {
   var f = tachesFiltrees();
   var html = "";
 
-  // Bouton "Ajouter" en haut, bien visible
- html += '<div style="display:flex;gap:8px;align-items:center">';
+  html += '<div style="display:flex;gap:8px;align-items:center">';
   html += '<button class="add-btn-top" style="flex:1" onclick="ouvrirFormulaire(null)">＋ Ajouter une tâche</button>';
-  html += '<button onclick="toggleTri()" style="font-size:12px;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer;white-space:nowrap" title="Changer l\'ordre">'+(triOrdre==="desc"?"↓ Plus récent":"↑ Plus ancien")+'</button>';
+  html += '<button onclick="toggleTri()" style="font-size:12px;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer;white-space:nowrap">'+(triOrdre==="desc"?"↓ Plus récent":"↑ Plus ancien")+'</button>';
   html += '</div>';
 
-  // Section tâches manuelles
   html += '<div class="section-label" style="margin-top:16px">À faire <span style="font-weight:400;color:#bbb">'+f.actives.length+' tâche'+(f.actives.length > 1 ? "s" : "")+'</span></div>';
   if (f.actives.length === 0) html += '<div style="color:#bbb;font-size:13px;padding:12px 0">Aucune tâche manuelle active.</div>';
   f.actives.forEach(function(t) { html += carteHTML(t, false, true); });
 
-  // Section tâches automatiques (repliable)
   if (f.auto.length > 0) {
     html += '<div class="section-label" style="margin-top:24px;cursor:pointer" onclick="toggleSectionAuto()">';
     html += '🤖 Tâches automatiques <span style="font-weight:400;color:#bbb">'+f.auto.length+'</span>';
@@ -354,7 +372,6 @@ function afficherTaches() {
     }
   }
 
-  // Section terminées (repliable)
   if (f.terminees.length > 0) {
     html += '<div class="section-label done-section" style="margin-top:20px;cursor:pointer" onclick="toggleSectionTerminees()">';
     html += 'Terminées <span style="font-weight:400;color:#bbb">'+f.terminees.length+'</span>';
@@ -367,25 +384,6 @@ function afficherTaches() {
 
   document.getElementById("liste-taches").innerHTML = html;
   activerDragDrop();
-}
-
-function toggleSectionAuto() {
-  sectionAutoOuverte = !sectionAutoOuverte;
-  afficherTaches();
-}
-
-function toggleTri() {
-  triOrdre = triOrdre === "desc" ? "asc" : "desc";
-  taches.sort(function(a, b) {
-    var oa = a.ordre > 0 ? a.ordre : 999999;
-    var ob = b.ordre > 0 ? b.ordre : 999999;
-    return triOrdre === "desc" ? ob - oa : oa - ob;
-  });
-  afficherTaches();
-}
-  function toggleSectionTerminees() {
-  sectionTermineesOuverte = !sectionTermineesOuverte;
-  afficherTaches();
 }
 
 function afficherTachesGroupees() {
@@ -419,6 +417,16 @@ function toggleGroupe(cle) {
   afficherTachesGroupees();
 }
 
+function toggleSectionAuto() {
+  sectionAutoOuverte = !sectionAutoOuverte;
+  afficherTaches();
+}
+
+function toggleSectionTerminees() {
+  sectionTermineesOuverte = !sectionTermineesOuverte;
+  afficherTaches();
+}
+
 function carteHTML(t, done, avecHandle) {
   var handle = avecHandle ? '<div class="drag-handle" draggable="true" data-ligne="'+t.ligne+'" title="Réordonner">⠿</div>' : '';
   var check = done
@@ -440,25 +448,19 @@ function carteHTML(t, done, avecHandle) {
     actions+'</div>';
 }
 
-// ---- DRAG & DROP ----
 function activerDragDrop() {
   var handles = document.querySelectorAll(".drag-handle");
   var rows = document.querySelectorAll(".task-row:not(.done-section)");
-
   handles.forEach(function(handle) {
     handle.addEventListener("dragstart", function(e) {
       dragSrcLigne = parseInt(handle.getAttribute("data-ligne"));
-      var row = handle.closest(".task-row");
-      row.classList.add("dragging");
+      handle.closest(".task-row").classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
     });
     handle.addEventListener("dragend", function() {
-      document.querySelectorAll(".task-row").forEach(function(r) {
-        r.classList.remove("dragging", "drag-over");
-      });
+      document.querySelectorAll(".task-row").forEach(function(r) { r.classList.remove("dragging", "drag-over"); });
     });
   });
-
   rows.forEach(function(row) {
     row.addEventListener("dragover", function(e) {
       e.preventDefault();
@@ -468,97 +470,26 @@ function activerDragDrop() {
     row.addEventListener("drop", function(e) {
       e.preventDefault();
       var targetLigne = parseInt(row.getAttribute("data-ligne"));
-      if (dragSrcLigne && dragSrcLigne !== targetLigne) {
-        reordonner(dragSrcLigne, targetLigne);
-      }
+      if (dragSrcLigne && dragSrcLigne !== targetLigne) reordonner(dragSrcLigne, targetLigne);
       row.classList.remove("drag-over");
     });
   });
 }
 
 function reordonner(ligneSrc, ligneDest) {
-  // Trouver les indices dans le tableau taches
-  var idxSrc = taches.findIndex(function(t) { return t.ligne === ligneSrc; });
-  var idxDest = taches.findIndex(function(t) { return t.ligne === ligneDest; });
-  if (idxSrc < 0 || idxDest < 0) return;
-
-  // Déplacer dans le tableau local (uniquement les actives)
   var actives = taches.filter(function(t) { return !t.statut || t.statut.indexOf("Terminé") === -1; });
   var autres = taches.filter(function(t) { return t.statut && t.statut.indexOf("Terminé") !== -1; });
-
   var iSrc = actives.findIndex(function(t) { return t.ligne === ligneSrc; });
   var iDest = actives.findIndex(function(t) { return t.ligne === ligneDest; });
   if (iSrc < 0 || iDest < 0) return;
-
   var deplace = actives.splice(iSrc, 1)[0];
   actives.splice(iDest, 0, deplace);
-
-  // Réassigner les numéros d'ordre
   actives.forEach(function(t, i) { t.ordre = i + 1; });
   taches = actives.concat(autres);
-
   afficherTaches();
-
-  // Sauvegarder l'ordre dans Sheets en arrière-plan
   var ordres = actives.map(function(t) { return t.ligne + ":" + t.ordre; }).join(",");
   call({ action: "sauverOrdre", ordres: ordres }, null);
 }
-
-// ---- ACTIONS ----
-var MESSAGES_BRAVO = [
-  "You rock ! 🤘",
-  "Trop fort(e) ! 💪",
-  "Bien joué ! ✨",
-  "C'est dans la boîte ! 📦",
-  "Mission accomplie ! 🎯",
-  "On est les meilleurs ! 🏆",
-  "LCDC assure ! 🎸",
-  "Legendary ! 🌟",
-  "Bam ! Coché ! ✅",
-  "Et hop, c'est plié ! 🎉"
-];
-
-function jouerSon() {
-  try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var notes = [523, 659, 784, 1047];
-    notes.forEach(function(freq, i) {
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.25);
-      osc.start(ctx.currentTime + i * 0.08);
-      osc.stop(ctx.currentTime + i * 0.08 + 0.25);
-    });
-  } catch(e) {}
-}
-
-function afficherBravo() {
-  var msg = MESSAGES_BRAVO[Math.floor(Math.random() * MESSAGES_BRAVO.length)];
-  var el = document.createElement("div");
-  el.className = "bravo-msg";
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 2200);
-}
-
-function marquerFait(ligne) {
-var MESSAGES_BRAVO = [
-  "You rock ! 🤘",
-  "Trop fort(e) ! 💪",
-  "Bien joué ! ✨",
-  "C'est dans la boîte ! 📦",
-  "Mission accomplie ! 🎯",
-  "On est les meilleurs ! 🏆",
-  "LCDC assure ! 🎸",
-  "Legendary ! 🌟",
-  "Bam ! Coché ! ✅",
-  "Et hop, c'est plié ! 🎉"
-];
 
 function jouerSon() {
   try {
@@ -591,19 +522,8 @@ function afficherBravo() {
 function marquerFait(ligne) {
   var t = taches.find(function(x) { return x.ligne === ligne; });
   if (t) t.statut = "🎉 Terminé";
-
-  // Animation sur la coche
-  var checks = document.querySelectorAll(".task-check");
-  checks.forEach(function(c) {
-    if (c.getAttribute("onclick") && c.getAttribute("onclick").indexOf(ligne) !== -1) {
-      c.classList.add("celebrating");
-    }
-  });
-
-  // Son + message
   jouerSon();
   afficherBravo();
-
   setTimeout(function() { afficherTaches(); }, 400);
   call({ action: "marquerTermine", ligne: ligne }, null);
 }
@@ -663,7 +583,7 @@ function ouvrirFormulaire(ligne) {
   html += '<div class="form-row"><label>Priorité</label><select id="f-urgence"><option value="">—</option>';
   parametres.urgences.forEach(function(u) { html += '<option'+(t&&t.urgence===u?" selected":"")+'>'+u+'</option>'; });
   html += '</select></div>';
-  html += '<div class="form-row"><label>Date limite (optionnel)</label><input type="date" id="f-date" value="'+(t&&t.date?t.date:"")+'"></div>';
+  html += '<div class="form-row"><label>Date limite (optionnel)</label><input type="date" id="f-date" value="'+(t&&t.date?t.date.substring(0,10):"")+'"></div>';
   html += '<div class="form-row"><label>Notes</label><textarea id="f-notes">'+(t&&t.notes?t.notes:"")+'</textarea></div>';
   html += '<div class="form-row"><label>Lien (optionnel)</label><input id="f-lien" placeholder="https://…" value="'+(t&&t.lien?t.lien:"")+'"></div>';
   html += '<div class="modal-actions">';
@@ -696,7 +616,7 @@ function sauvegarder(ligne) {
     params.action = "modifierTache";
     params.ligne = ligne;
     params.statut = t ? t.statut : "🛠️ À faire";
-    params.date = t ? t.date : "";
+    params.date = params.date || (t ? t.date : "");
     if (t) {
       t.nom = params.nom; t.groupe = params.groupe;
       t.collab = params.collab; t.urgence = params.urgence;
