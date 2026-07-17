@@ -69,6 +69,10 @@
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .error-msg { background: #FCEBEB; color: #A32D2D; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
     .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 1px solid #ddd; }
+    @keyframes popIn { 0% { transform: scale(0) rotate(-10deg); opacity:0; } 70% { transform: scale(1.2) rotate(3deg); } 100% { transform: scale(1) rotate(0deg); opacity:1; } }
+    @keyframes slideUp { 0% { transform: translateY(0); opacity:1; } 80% { transform: translateY(-40px); opacity:1; } 100% { transform: translateY(-60px); opacity:0; } }
+    .bravo-msg { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 15px; font-weight: 600; z-index: 999; animation: slideUp 2.2s ease forwards; pointer-events: none; white-space: nowrap; }
+    .task-check.celebrating { animation: popIn 0.4s cubic-bezier(.36,.07,.19,.97); background: #1a1a1a; border-color: #1a1a1a; }
   </style>
 </head>
 <body>
@@ -501,10 +505,106 @@ function reordonner(ligneSrc, ligneDest) {
 }
 
 // ---- ACTIONS ----
+var MESSAGES_BRAVO = [
+  "You rock ! 🤘",
+  "Trop fort(e) ! 💪",
+  "Bien joué ! ✨",
+  "C'est dans la boîte ! 📦",
+  "Mission accomplie ! 🎯",
+  "On est les meilleurs ! 🏆",
+  "LCDC assure ! 🎸",
+  "Legendary ! 🌟",
+  "Bam ! Coché ! ✅",
+  "Et hop, c'est plié ! 🎉"
+];
+
+function jouerSon() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var notes = [523, 659, 784, 1047];
+    notes.forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.25);
+      osc.start(ctx.currentTime + i * 0.08);
+      osc.stop(ctx.currentTime + i * 0.08 + 0.25);
+    });
+  } catch(e) {}
+}
+
+function afficherBravo() {
+  var msg = MESSAGES_BRAVO[Math.floor(Math.random() * MESSAGES_BRAVO.length)];
+  var el = document.createElement("div");
+  el.className = "bravo-msg";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 2200);
+}
+
+function marquerFait(ligne) {
+var MESSAGES_BRAVO = [
+  "You rock ! 🤘",
+  "Trop fort(e) ! 💪",
+  "Bien joué ! ✨",
+  "C'est dans la boîte ! 📦",
+  "Mission accomplie ! 🎯",
+  "On est les meilleurs ! 🏆",
+  "LCDC assure ! 🎸",
+  "Legendary ! 🌟",
+  "Bam ! Coché ! ✅",
+  "Et hop, c'est plié ! 🎉"
+];
+
+function jouerSon() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var notes = [523, 659, 784, 1047];
+    notes.forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.25);
+      osc.start(ctx.currentTime + i * 0.08);
+      osc.stop(ctx.currentTime + i * 0.08 + 0.25);
+    });
+  } catch(e) {}
+}
+
+function afficherBravo() {
+  var msg = MESSAGES_BRAVO[Math.floor(Math.random() * MESSAGES_BRAVO.length)];
+  var el = document.createElement("div");
+  el.className = "bravo-msg";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 2200);
+}
+
 function marquerFait(ligne) {
   var t = taches.find(function(x) { return x.ligne === ligne; });
   if (t) t.statut = "🎉 Terminé";
-  afficherTaches();
+
+  // Animation sur la coche
+  var checks = document.querySelectorAll(".task-check");
+  checks.forEach(function(c) {
+    if (c.getAttribute("onclick") && c.getAttribute("onclick").indexOf(ligne) !== -1) {
+      c.classList.add("celebrating");
+    }
+  });
+
+  // Son + message
+  jouerSon();
+  afficherBravo();
+
+  setTimeout(function() { afficherTaches(); }, 400);
   call({ action: "marquerTermine", ligne: ligne }, null);
 }
 
