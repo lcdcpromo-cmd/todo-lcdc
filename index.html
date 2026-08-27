@@ -331,7 +331,10 @@ function toggleTri() {
 }
 
 function estAuto(t) {
-  return t.notes && t.notes.toString().trim().toLowerCase() === "généré automatiquement";
+  var notes = (t.notes || "").toString().trim().toLowerCase();
+  return notes === "généré automatiquement" ||
+         notes.indexOf("à envoyer") === 0 ||
+         notes.indexOf("a envoyer") === 0;
 }
 
 function tachesFiltrees() {
