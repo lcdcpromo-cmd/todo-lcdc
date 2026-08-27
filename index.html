@@ -292,9 +292,8 @@ function chargerTaches() {
   document.getElementById("liste-taches").innerHTML = '<div class="loading">Chargement…</div>';
   call({ action: "getTaches" }, function(data) {
     data.sort(function(a, b) {
-      return triOrdre === "desc" ? b.ligne - a.ligne : a.ligne - b.ligne;
+      return triOrdre === "desc" ? (b.ligne - a.ligne) : (a.ligne - b.ligne);
     });
-}
 
 function setFiltre(type, val, el) {
   filtres[type] = val;
@@ -317,11 +316,9 @@ function setVue(v) {
 
 function toggleTri() {
   triOrdre = triOrdre === "desc" ? "asc" : "desc";
-  taches.sort(function(a, b) {
-    var oa = a.ordre > 0 ? a.ordre : 999999;
-    var ob = b.ordre > 0 ? b.ordre : 999999;
-    return triOrdre === "desc" ? ob - oa : oa - ob;
-  });
+     taches.sort(function(a, b) {
+      return triOrdre === "desc" ? (b.ligne - a.ligne) : (a.ligne - b.ligne);
+    });
   afficherTaches();
 }
 
