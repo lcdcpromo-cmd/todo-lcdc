@@ -229,14 +229,44 @@ function call(params, callback) {
 }
 
 function init() {
+  // Afficher le cache immédiatement si disponible
+  try {
+    var cache = localStorage.getItem("lcdc_cache");
+    if (cache) {
+      var d = JSON.parse(cache);
+      parametres = d.parametres;
+      var norm = {};
+      Object.keys(d.couleurs).forEach(function(k) { norm[normaliser(k)] = d.couleurs[k]; });
+      couleursGroupes = norm;
+      taches = d.taches;
+      construireFiltres();
+      afficherTaches();
+    }
+  } catch(e) {}
+
+  // Charger les vraies données en arrière-plan
   call({ action: "getParametres" }, function(p) {
     parametres = p;
     call({ action: "getCouleurs" }, function(c) {
       var norm = {};
       Object.keys(c).forEach(function(k) { norm[normaliser(k)] = c[k]; });
       couleursGroupes = norm;
-      construireFiltres();
-      chargerTaches();
+      call({ action: "getTaches" }, function(data) {
+        data.sort(function(a, b) {
+          return triOrdre === "desc" ? (b.ligne - a.ligne) : (a.ligne - b.ligne);
+        });
+        taches = data;
+        construireFiltres();
+        afficherTaches();
+        // Sauvegarder en cache pour la prochaine fois
+        try {
+          localStorage.setItem("lcdc_cache", JSON.stringify({
+            parametres: parametres,
+            couleurs: couleursGroupes,
+            taches: taches
+          }));
+        } catch(e) {}
+      });
     });
   });
 }
