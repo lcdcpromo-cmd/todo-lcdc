@@ -229,17 +229,15 @@ function call(params, callback) {
 }
 
 function init() {
-  call({ action: "getAll" }, function(data) {
-    parametres = data.parametres;
-    var norm = {};
-    Object.keys(data.couleurs).forEach(function(k) { norm[normaliser(k)] = data.couleurs[k]; });
-    couleursGroupes = norm;
-    construireFiltres();
-    data.taches.sort(function(a, b) {
-      return triOrdre === "desc" ? (b.ligne - a.ligne) : (a.ligne - b.ligne);
+  call({ action: "getParametres" }, function(p) {
+    parametres = p;
+    call({ action: "getCouleurs" }, function(c) {
+      var norm = {};
+      Object.keys(c).forEach(function(k) { norm[normaliser(k)] = c[k]; });
+      couleursGroupes = norm;
+      construireFiltres();
+      chargerTaches();
     });
-    taches = data.taches;
-    afficherTaches();
   });
 }
 
