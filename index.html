@@ -62,21 +62,28 @@
     .done-section { opacity: .55; }
 
     /* ── VUE KANBAN ── */
-    .kanban-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 24px; align-items: flex-start; }
-    .kanban-col { background: #fff; border-radius: 12px; border: 1px solid #e8e8e8; width: 272px; min-width: 272px; display: flex; flex-direction: column; max-height: calc(100vh - 160px); flex-shrink: 0; }
-    .kanban-col-header { padding: 12px 14px 10px; display: flex; align-items: center; justify-content: space-between; border-radius: 12px 12px 0 0; border-bottom: 1px solid #f0f0f0; }
-    .kanban-col-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .kanban-col-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-    .kanban-col-count { font-size: 11px; color: #aaa; background: #f5f5f5; padding: 2px 8px; border-radius: 20px; }
-    .kanban-col-body { overflow-y: auto; padding: 10px; flex: 1; }
-    .kanban-card { background: #fafafa; border-radius: 8px; border: 1px solid #ebebeb; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
-    .kanban-card:hover { border-color: #bbb; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .kanban-card-name { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-bottom: 7px; line-height: 1.4; }
-    .kanban-card-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-    .kanban-card-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity .12s; }
-    .kanban-card:hover .kanban-card-actions { opacity: 1; }
-    .kanban-add-btn { display: flex; align-items: center; gap: 6px; padding: 9px 14px; color: #aaa; font-size: 12px; cursor: pointer; border-top: 1px solid #f0f0f0; background: transparent; border-left: none; border-right: none; border-bottom: none; width: 100%; font-family: inherit; transition: color .12s, background .12s; border-radius: 0 0 12px 12px; }
-    .kanban-add-btn:hover { color: #555; background: #fafafa; }
+    .kanban-board { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 24px; align-items: flex-start; }
+    .kanban-col { background: #fff; border-radius: 14px; border: 1px solid #e8e8e8; width: 300px; min-width: 300px; display: flex; flex-direction: column; max-height: calc(100vh - 160px); flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    .kanban-col-header { padding: 18px 18px 0; border-radius: 14px 14px 0 0; }
+    .kanban-col-title { font-size: 17px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.01em; display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .kanban-col-count { font-size: 12px; color: #aaa; font-weight: 400; }
+    .kanban-col-add-top { display: flex; align-items: center; gap: 5px; padding: 8px 0 14px; color: #aaa; font-size: 13px; cursor: pointer; background: transparent; border: none; width: 100%; font-family: inherit; transition: color .12s; text-align: left; border-bottom: 1px solid #f0f0f0; margin-bottom: 4px; }
+    .kanban-col-add-top:hover { color: #1a1a1a; }
+    .kanban-col-body { overflow-y: auto; padding: 8px 12px 12px; flex: 1; }
+    /* Ligne de tâche style TasksBoard */
+    .kanban-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 6px; border-radius: 8px; cursor: pointer; transition: background .1s; }
+    .kanban-row:hover { background: #f7f7f7; }
+    .kanban-row-check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #ccc; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: border-color .15s; }
+    .kanban-row:hover .kanban-row-check { border-color: #888; }
+    .kanban-row-body { flex: 1; min-width: 0; }
+    .kanban-row-name { font-size: 13.5px; font-weight: 500; color: #1a1a1a; line-height: 1.4; }
+    .kanban-row-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .kanban-row-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity .12s; }
+    .kanban-row:hover .kanban-row-actions { opacity: 1; }
+    /* Section terminées */
+    .kanban-done-toggle { display: flex; align-items: center; gap: 6px; padding: 9px 6px; color: #aaa; font-size: 12.5px; cursor: pointer; border-top: 1px solid #f0f0f0; margin-top: 4px; user-select: none; }
+    .kanban-done-toggle:hover { color: #888; }
+    .kanban-done-badge { background: #f0f0f0; color: #888; font-size: 11px; padding: 1px 7px; border-radius: 20px; font-weight: 500; }
 
     /* ── MODALE ── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
@@ -455,35 +462,38 @@ function afficherTachesGroupees() {
 /* ════════════════════════════════
    VUE KANBAN (colonnes par groupe)
 ════════════════════════════════ */
+var kanbanTermineesOuvertes = {};
+
 function afficherKanban() {
   // Filtres collab / urgence / métier s'appliquent, mais pas le filtre groupe
-  // (le filtre groupe n'a pas de sens en vue colonnes puisque chaque groupe = une colonne)
   var tachesFilt = taches.filter(function(t) {
     if (filtres.collab && t.collab.indexOf(filtres.collab) === -1) return false;
     if (filtres.urgence && t.urgence !== filtres.urgence) return false;
     if (filtres.metier && t.metier !== filtres.metier) return false;
-    if (t.statut && t.statut.indexOf("Terminé") !== -1) return false;
     if (estAuto(t)) return false;
     return true;
   });
 
-  // Distribuer par groupe, en gardant l'ordre de parametres.groupes
-  var parGroupe = {};
-  parametres.groupes.forEach(function(g) { parGroupe[g] = []; });
+  // Séparer actives et terminées par groupe
+  var parGroupe = {}, termineesParGroupe = {};
+  parametres.groupes.forEach(function(g) { parGroupe[g] = []; termineesParGroupe[g] = []; });
 
   tachesFilt.forEach(function(t) {
     var g = t.groupe || "";
-    if (!parGroupe[g]) parGroupe[g] = [];
-    parGroupe[g].push(t);
+    if (!parGroupe[g]) { parGroupe[g] = []; termineesParGroupe[g] = []; }
+    if (t.statut && t.statut.indexOf("Terminé") !== -1) {
+      termineesParGroupe[g].push(t);
+    } else {
+      parGroupe[g].push(t);
+    }
   });
 
-  // Colonnes = groupes qui ont des tâches OU tous les groupes si aucun filtre
+  // Colonnes = groupes qui ont des tâches actives OU terminées
   var colonnes = parametres.groupes.filter(function(g) {
-    return parGroupe[g] && parGroupe[g].length > 0;
+    return (parGroupe[g] && parGroupe[g].length > 0) || (termineesParGroupe[g] && termineesParGroupe[g].length > 0);
   });
 
-  // Si aucune tâche filtrée, montrer quand même tous les groupes vides
-  if (colonnes.length === 0 && tachesFilt.length === 0) {
+  if (colonnes.length === 0) {
     colonnes = parametres.groupes.slice();
   }
 
@@ -497,23 +507,40 @@ function afficherKanban() {
   colonnes.forEach(function(g) {
     var cl = couleurGroupe(g);
     var liste = parGroupe[g] || [];
-    html += '<div class="kanban-col">';
-    // En-tête avec bande couleur en haut
-    html += '<div class="kanban-col-header" style="border-top:3px solid '+cl.color+';border-radius:12px 12px 0 0">';
-    html += '<span class="kanban-col-title"><span class="kanban-col-dot" style="background:'+cl.color+'"></span>'+g+'</span>';
-    html += '<span class="kanban-col-count">'+liste.length+'</span>';
+    var terminees = termineesParGroupe[g] || [];
+    var gEsc = g.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var doneOuvert = kanbanTermineesOuvertes[g] || false;
+
+    html += '<div class="kanban-col" style="border-top:3px solid '+cl.color+'">';
+
+    // En-tête : grand titre gras + nombre de tâches
+    html += '<div class="kanban-col-header">';
+    html += '<div class="kanban-col-title">'+g+' <span class="kanban-col-count">'+liste.length+'</span></div>';
+    // Lien "＋ Ajouter une tâche" en haut
+    html += '<button class="kanban-col-add-top" onclick="ouvrirFormulaire(null,\''+gEsc+'\')" title="Ajouter une tâche dans ce groupe">＋ Ajouter une tâche</button>';
     html += '</div>';
+
     html += '<div class="kanban-col-body">';
-    if (liste.length === 0) {
+    if (liste.length === 0 && terminees.length === 0) {
       html += '<div style="color:#ccc;font-size:12px;text-align:center;padding:20px 0">Aucune tâche</div>';
     } else {
-      liste.forEach(function(t) { html += kanbanCarteHTML(t); });
+      liste.forEach(function(t) { html += kanbanLigneHTML(t); });
     }
+
+    // Section terminées repliable
+    if (terminees.length > 0) {
+      html += '<div class="kanban-done-toggle" onclick="toggleKanbanDone(\''+gEsc+'\')">';
+      html += '<span style="font-size:10px;transform:'+(doneOuvert?'':'rotate(-90deg)')+';display:inline-block;transition:transform .15s">▾</span>';
+      html += 'Terminé <span class="kanban-done-badge">'+terminees.length+'</span>';
+      html += '</div>';
+      if (doneOuvert) {
+        html += '<div style="opacity:.6">';
+        terminees.forEach(function(t) { html += kanbanLigneHTML(t, true); });
+        html += '</div>';
+      }
+    }
+
     html += '</div>';
-    var gEsc = g.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    html += '<button class="kanban-add-btn" onclick="ouvrirFormulaire(null,\''+gEsc+'\')">';
-    html += '＋ Ajouter';
-    html += '</button>';
     html += '</div>';
   });
 
@@ -521,20 +548,36 @@ function afficherKanban() {
   document.getElementById("liste-taches").innerHTML = html;
 }
 
-function kanbanCarteHTML(t) {
+function toggleKanbanDone(g) {
+  kanbanTermineesOuvertes[g] = !kanbanTermineesOuvertes[g];
+  afficherKanban();
+}
+
+function kanbanLigneHTML(t, done) {
   var meta = "";
   if (t.urgence) meta += badgeUrgence(t.urgence);
   if (t.collab) meta += badgeCollab(t.collab);
   if (t.metier && normaliser(t.metier) !== "non defini") meta += '<span class="badge" style="background:#f1f1f1;color:#555">'+t.metier+'</span>';
 
-  return '<div class="kanban-card" onclick="ouvrirDetail('+t.ligne+')">'+
-    '<div class="kanban-card-name">'+t.nom+'</div>'+
-    (meta ? '<div class="kanban-card-meta">'+meta+'</div>' : '')+
-    '<div class="kanban-card-actions">'+
-    '<button class="icon-btn" onclick="event.stopPropagation();marquerFait('+t.ligne+')" title="Marquer fait" style="color:#4ade80;font-size:16px">✓</button>'+
+  var checkInner = done
+    ? '<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    : '';
+  var checkStyle = done ? 'border-color:#ccc' : '';
+
+  var actions = done ? '' :
+    '<div class="kanban-row-actions">'+
+    '<button class="icon-btn" onclick="event.stopPropagation();marquerFait('+t.ligne+')" title="Marquer fait" style="color:#4ade80">✓</button>'+
     '<button class="icon-btn" onclick="event.stopPropagation();ouvrirFormulaire('+t.ligne+')" title="Modifier">✎</button>'+
     '<button class="icon-btn" onclick="event.stopPropagation();supprimerTache('+t.ligne+')" style="color:#ffbbbb" title="Supprimer">✕</button>'+
+    '</div>';
+
+  return '<div class="kanban-row" onclick="ouvrirDetail('+t.ligne+')">'+
+    '<div class="kanban-row-check" style="'+checkStyle+'" onclick="event.stopPropagation();'+(done?'':('marquerFait('+t.ligne+')'))+'">'+checkInner+'</div>'+
+    '<div class="kanban-row-body">'+
+      '<div class="kanban-row-name"'+(done?' style="text-decoration:line-through;color:#aaa"':'')+'>'+t.nom+'</div>'+
+      (meta ? '<div class="kanban-row-meta">'+meta+'</div>' : '')+
     '</div>'+
+    actions+
     '</div>';
 }
 
