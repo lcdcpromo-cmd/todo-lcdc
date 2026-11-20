@@ -104,6 +104,15 @@
     .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
     .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 1px solid #ddd; }
 
+    /* ── BARRE DE RECHERCHE ── */
+    .search-bar-wrap { position: relative; margin-bottom: 12px; }
+    .search-bar { width: 100%; font-size: 13.5px; padding: 9px 36px 9px 36px; border-radius: 10px; border: 1px solid #e0e0e0; background: #fff; color: #1a1a1a; font-family: inherit; outline: none; transition: border-color .15s; }
+    .search-bar:focus { border-color: #aaa; }
+    .search-bar-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #bbb; font-size: 15px; pointer-events: none; }
+    .search-bar-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #bbb; cursor: pointer; font-size: 15px; padding: 0 2px; display: none; }
+    .search-bar-clear.visible { display: block; }
+    .search-bar-clear:hover { color: #555; }
+
     /* ── BRAVO ── */
     @keyframes slideUp { 0% { transform: translateX(-50%) translateY(0); opacity:1; } 80% { transform: translateX(-50%) translateY(-40px); opacity:1; } 100% { transform: translateX(-50%) translateY(-60px); opacity:0; } }
     .bravo-msg { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 15px; font-weight: 600; z-index: 999; animation: slideUp 2.2s ease forwards; pointer-events: none; white-space: nowrap; }
@@ -117,6 +126,12 @@
       <div class="avatars" id="avatars"></div>
       <button onclick="ouvrirPanneauCouleurs()" style="font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;color:#555">🎨 Couleurs</button>
     </div>
+  </div>
+
+  <div class="search-bar-wrap">
+    <span class="search-bar-icon">🔍</span>
+    <input class="search-bar" id="search-input" type="text" placeholder="Rechercher une tâche…" oninput="onRecherche()" autocomplete="off">
+    <button class="search-bar-clear" id="search-clear" onclick="effacerRecherche()" title="Effacer">✕</button>
   </div>
 
   <div class="toggle-bar">
@@ -161,6 +176,24 @@ var sectionAutoOuverte = false;
 var sectionTermineesOuverte = false;
 var triOrdre = "desc";
 var dragSrcLigne = null;
+
+var recherche = "";
+
+function onRecherche() {
+  recherche = (document.getElementById("search-input").value || "").trim();
+  var clearBtn = document.getElementById("search-clear");
+  if (clearBtn) clearBtn.classList.toggle("visible", recherche.length > 0);
+  afficherTaches();
+}
+
+function effacerRecherche() {
+  var inp = document.getElementById("search-input");
+  if (inp) inp.value = "";
+  recherche = "";
+  var clearBtn = document.getElementById("search-clear");
+  if (clearBtn) clearBtn.classList.remove("visible");
+  afficherTaches();
+}
 
 var COULEURS_COLLABS = {
   "CYRIL":   { bg: "#E6F1FB", color: "#185FA5" },
@@ -374,6 +407,15 @@ function estAuto(t) {
          notes.indexOf("a envoyer") === 0;
 }
 
+function matchRecherche(t) {
+  if (!recherche) return true;
+  var q = normaliser(recherche);
+  return normaliser(t.nom).indexOf(q) !== -1 ||
+         normaliser(t.groupe || "").indexOf(q) !== -1 ||
+         normaliser(t.collab || "").indexOf(q) !== -1 ||
+         normaliser(t.notes || "").indexOf(q) !== -1;
+}
+
 function tachesFiltrees() {
   var actives = [], auto = [], terminees = [];
   taches.forEach(function(t) {
@@ -381,6 +423,7 @@ function tachesFiltrees() {
     if (filtres.collab && t.collab.indexOf(filtres.collab) === -1) return;
     if (filtres.urgence && t.urgence !== filtres.urgence) return;
     if (filtres.metier && t.metier !== filtres.metier) return;
+    if (!matchRecherche(t)) return;
     if (t.statut && t.statut.indexOf("Terminé") !== -1) terminees.push(t);
     else if (estAuto(t)) auto.push(t);
     else actives.push(t);
@@ -472,6 +515,7 @@ function afficherKanban() {
     if (filtres.urgence && t.urgence !== filtres.urgence) return false;
     if (filtres.metier && t.metier !== filtres.metier) return false;
     if (estAuto(t)) return false;
+    if (!matchRecherche(t)) return false;
     return true;
   });
 
